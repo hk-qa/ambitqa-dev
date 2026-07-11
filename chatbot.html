@@ -102,17 +102,33 @@
     border: 1px solid color-mix(in srgb, var(--brand-500) 25%, transparent);
     padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;
   }
-  .nav-left .version-badge {
-    font-size: 0.72rem; color: var(--text-dim);
+  .nav-left .home-badge {
+    font-size: 0.75rem; color: var(--text-muted);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-strong);
+    padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .nav-left .home-badge:hover {
+    background: var(--bg-elev); color: var(--text);
+    border-color: var(--brand-500);
+  }
+  .logo-wrap {
+    display: flex; align-items: center; gap: 0.4rem;
+    justify-self: center; text-align: center;
+  }
+  .logo-version {
+    font-size: 0.7rem; color: var(--text-dim);
     background: var(--bg-elev-2);
     border: 1px solid var(--border);
-    padding: 0.2rem 0.5rem; border-radius: 999px; font-weight: 600;
+    padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600;
     font-family: 'Menlo', monospace;
+    align-self: center; margin-top: 0.1rem;
   }
   .logo {
     font-family: var(--font-d); font-weight: 800; font-size: 1.8rem;
     color: var(--text); text-decoration: none; letter-spacing: -0.03em;
-    justify-self: center; text-align: center;
   }
   .logo span { background: linear-gradient(135deg, var(--brand-500), var(--violet-500)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   .nav-right { display: flex; align-items: center; gap: 0.5rem; justify-self: end; }
@@ -508,6 +524,14 @@
   .send-btn:hover { opacity: 0.9; }
   .send-btn:disabled { background: var(--text-dim); cursor: not-allowed; }
   .send-btn svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .stop-btn {
+    width: 50px; height: 50px; border-radius: var(--r-md); flex-shrink: 0;
+    background: #ef4444; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; transition: opacity 0.15s;
+  }
+  .stop-btn:hover { opacity: 0.85; }
+  .stop-btn svg { width: 16px; height: 16px; }
   .input-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.6rem; text-align: center; }
 
   /* AUTOSUGGEST */
@@ -729,9 +753,12 @@
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
     </button>
     <span class="nav-badge">ISTQB · IEEE 829 grounded</span>
-    <span class="version-badge">v1.3.1</span>
+    <a class="home-badge" href="index.html" title="Go to home page">⌂ Home</a>
   </div>
-  <a class="logo" href="index.html">Ambit<span>QA</span></a>
+  <div class="logo-wrap">
+    <a class="logo" href="index.html">Ambit<span>QA</span></a>
+    <span class="logo-version">v1.3.1</span>
+  </div>
   <div class="nav-right">
     <select id="providerSelect" class="nav-select" onchange="onProviderChange()" title="Select AI provider">
       <option value="anthropic">Anthropic</option>
@@ -815,6 +842,9 @@
       <button class="mode-btn" onclick="setMode(this,'defects')">Defect Management<span class="mode-phase">Bug reports · Triage</span></button>
       <button class="mode-btn" onclick="setMode(this,'closure')">Test Closure<span class="mode-phase">Summary · Lessons</span></button>
       <button class="mode-btn" onclick="setMode(this,'automation')">Test Automation<span class="mode-phase">Playwright · Cypress · BDD</span></button>
+      <button class="mode-btn" onclick="setMode(this,'api')">API Testing<span class="mode-phase">REST · GraphQL · JWT</span></button>
+      <button class="mode-btn" onclick="setMode(this,'security')">Security Testing<span class="mode-phase">OWASP · XSS · Injection</span></button>
+      <button class="mode-btn" onclick="setMode(this,'performance')">Performance Testing<span class="mode-phase">k6 · JMeter · Load</span></button>
     </div>
 
     <div class="sidebar-section">
@@ -867,6 +897,9 @@
         </div>
         <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send">
           <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+        <button class="stop-btn" id="stopBtn" onclick="stopGeneration()" aria-label="Stop generation" style="display:none;" title="Stop generation">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
         </button>
       </div>
       <div class="input-hint">Shift+Enter for new line · Enter to send · ↑↓ to pick suggestion · 📎 attach screenshots, PDFs, or HTML files</div>
@@ -934,6 +967,7 @@ let apiKey = '';
 let currentMode = 'general';
 let conversationHistory = [];
 let targetApp = { url: '', description: '', pageContent: '', fetchStatus: 'none' };
+let currentAbortController = null;
 let pendingAttachments = [];
 
 // ─── ATTACHMENT HANDLING ───────────────────────────────
@@ -1145,7 +1179,7 @@ const modeInfo = {
     'Generate test metrics summary: defect density, pass rate, defect leakage',
     'Create a release readiness assessment template',
   ]},
-  automation: { label: 'Test Automation', desc: '— Framework code & scripts', actionsLabel: 'Automation actions', actions: [
+  automation: { label: 'Test Automation', desc: '— Playwright · Cypress · BDD', actionsLabel: 'Automation actions', actions: [
     'Generate a Playwright (TypeScript) Page Object Model and tests for the target application',
     'Generate Cypress (JavaScript) tests with POM for the target application',
     'Generate Selenium WebDriver (Python + pytest) framework for the target application',
@@ -1154,6 +1188,36 @@ const modeInfo = {
     'Convert these manual test cases into Playwright automation scripts',
     'Generate a sample GitHub Actions CI workflow for running the automation tests',
     'I will paste page HTML next — generate Playwright POM with exact selectors from that HTML',
+  ]},
+  api: { label: 'API Testing', desc: '— REST · GraphQL · JWT/OAuth', actionsLabel: 'API test actions', actions: [
+    'Generate REST API test cases for the target application endpoints',
+    'Create a Postman collection with tests for common HTTP methods (GET, POST, PUT, DELETE)',
+    'Generate GraphQL query and mutation test cases',
+    'Write API contract tests to validate response schema and status codes',
+    'Create JWT/OAuth authentication test scenarios',
+    'Generate negative API test cases — invalid tokens, missing fields, edge cases',
+    'Write a k6 or Artillery load test script for the main API endpoints',
+    'Generate API test automation scripts using Python requests + pytest',
+  ]},
+  security: { label: 'Security Testing', desc: '— OWASP Top 10 · XSS · Injection', actionsLabel: 'Security actions', actions: [
+    'Generate OWASP Top 10 security test cases for the target application',
+    'Create XSS (Cross-Site Scripting) injection test cases for all input fields',
+    'Write SQL injection test scenarios for the target application forms',
+    'Generate IDOR (Insecure Direct Object Reference) test cases',
+    'Create authentication and session management security test cases',
+    'Write CSRF (Cross-Site Request Forgery) test scenarios',
+    'Generate a security test checklist for a pre-release sign-off',
+    'Create Burp Suite / OWASP ZAP testing approach for the target application',
+  ]},
+  performance: { label: 'Performance Testing', desc: '— k6 · JMeter · Load & Stress', actionsLabel: 'Performance actions', actions: [
+    'Generate a k6 load test script for the target application',
+    'Create a JMeter test plan for load and stress testing',
+    'Write performance test scenarios: load, stress, spike, and soak tests',
+    'Generate performance acceptance criteria and SLA thresholds',
+    'Create a performance test execution report template',
+    'Write a baseline performance benchmark test for the target application',
+    'Generate ramp-up and ramp-down load test scenarios',
+    'Create a performance testing strategy document',
   ]}
 };
 
@@ -1169,6 +1233,9 @@ function retrieve(query, mode, topK = 4) {
     defects:['defect','bug','severity','priority','report'],
     closure:['closure','close','lessons','exit','criteria','sign'],
     automation:['playwright','cypress','selenium','automation','pom','page object','bdd','gherkin','cucumber','script','code'],
+    api:['api','rest','graphql','endpoint','http','request','response','postman','jwt','oauth','contract'],
+    security:['security','owasp','xss','injection','sql','csrf','idor','authentication','session','vulnerability'],
+    performance:['performance','load','stress','spike','soak','k6','jmeter','throughput','latency','concurrent'],
     general:[]
   };
   const scored = KB.map(chunk => {
@@ -1197,7 +1264,10 @@ function buildSystemPrompt(chunks, mode, htmlAttachments = []) {
     execution: 'You are focused on Test Execution: running tests, logging results, run summaries.',
     defects: 'You are focused on Defect Management: IEEE 829 bug reports, severity/priority triage.',
     closure: 'You are focused on Test Closure: summary reports, exit criteria, lessons learned.',
-    automation: 'You are focused on Test Automation: generating production-ready Page Object Model code, test scripts, and project structures in Playwright (TypeScript preferred), Cypress (JavaScript), Selenium WebDriver (Python + pytest), and BDD/Cucumber+Gherkin. Always produce complete, runnable code with proper imports, modern locator strategies (getByRole, getByLabel, data-testid), POM separation, and a brief setup README. Use fenced code blocks with the correct language tag (```typescript, ```javascript, ```python, ```gherkin, ```yaml). IMPORTANT: when generating selectors, be honest about your source. If you only have a SCREENSHOT (no HTML), use role/label/text-based locators inferred from visible UI elements, and explicitly note at the top: "// NOTE: selectors inferred from visual UI. Verify against actual DOM (right-click → Inspect) before running." If you have ACTUAL HTML (from CORS fetch or user-pasted), use exact attribute selectors (id, name, data-testid) from the HTML and note: "// Selectors extracted from page HTML — should run as-is." If you have NEITHER, use generic placeholders like <TODO: locate via inspector> and flag this clearly. Never fabricate specific selectors that have no basis in either screenshot or HTML.'
+    automation: 'You are focused on Test Automation: generating production-ready Page Object Model code, test scripts, and project structures in Playwright (TypeScript preferred), Cypress (JavaScript), Selenium WebDriver (Python + pytest), and BDD/Cucumber+Gherkin. Always produce complete, runnable code with proper imports, modern locator strategies (getByRole, getByLabel, data-testid), POM separation, and a brief setup README. Use fenced code blocks with the correct language tag (```typescript, ```javascript, ```python, ```gherkin, ```yaml). IMPORTANT: when generating selectors, be honest about your source. If you only have a SCREENSHOT (no HTML), use role/label/text-based locators inferred from visible UI elements, and explicitly note at the top: "// NOTE: selectors inferred from visual UI. Verify against actual DOM (right-click → Inspect) before running." If you have ACTUAL HTML (from CORS fetch or user-pasted), use exact attribute selectors (id, name, data-testid) from the HTML and note: "// Selectors extracted from page HTML — should run as-is." If you have NEITHER, use generic placeholders like <TODO: locate via inspector> and flag this clearly. Never fabricate specific selectors that have no basis in either screenshot or HTML.',
+    api: 'You are focused on API Testing: REST, GraphQL, Postman collections, JWT/OAuth, contract testing, and API automation. Generate complete test suites with positive, negative, boundary, and security test cases for APIs. Include status code validation, response schema checks, header validation, and authentication testing. For automation, generate Python requests+pytest or JavaScript/Axios scripts. Reference ISTQB API testing principles and IEEE 829 test documentation standards.',
+    security: 'You are focused on Security Testing: OWASP Top 10, XSS, SQL injection, CSRF, IDOR, authentication flaws, session management, and security misconfigurations. Generate detailed security test cases with attack vectors, payloads, and expected behaviors. Reference OWASP Testing Guide methodology. Include both manual testing steps and automated scanning approaches using tools like Burp Suite and OWASP ZAP.',
+    performance: 'You are focused on Performance Testing: load testing, stress testing, spike testing, soak testing, and scalability testing. Generate k6 scripts, JMeter test plans, and performance test strategies. Define SLA thresholds, acceptance criteria, and ramp-up/ramp-down profiles. Include monitoring guidance and performance test reporting templates. Reference ISTQB performance testing principles.'
   };
   const context = chunks.map(c => `[${c.source}]\n${c.text}`).join('\n\n---\n\n');
   let targetContext = '';
@@ -1278,8 +1348,10 @@ async function callClaude(userMessage, attachments = []) {
   }
 
   conversationHistory.push({ role: 'user', content });
+  currentAbortController = new AbortController();
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
+    signal: currentAbortController.signal,
     headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
     body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:48000, system:systemPrompt, messages:conversationHistory })
   });
@@ -2028,6 +2100,7 @@ async function sendMessage() {
   appendMessage('user', userHtml);
 
   btn.disabled = true;
+  document.getElementById('stopBtn').style.display = 'flex';
   showTyping();
   try {
     const { text: reply, chunks, wasTruncated } = await callClaude(text, attachments);
@@ -2055,10 +2128,22 @@ async function sendMessage() {
     }
   } catch (err) {
     hideTyping();
-    appendMessage('agent', `<p style="color:var(--rose-400)">Error: ${err.message}. Please check your API key and try again.</p>`);
+    if (err.name === 'AbortError') {
+      appendMessage('agent', `<p style="color:var(--text-muted);font-style:italic;">⏹ Generation stopped.</p>`);
+    } else {
+      appendMessage('agent', `<p style="color:var(--rose-400)">Error: ${err.message}. Please check your API key and try again.</p>`);
+    }
   }
   btn.disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  currentAbortController = null;
   input.focus();
+}
+
+function stopGeneration() {
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
 }
 
 // ─── UI ────────────────────────────────────────────────
