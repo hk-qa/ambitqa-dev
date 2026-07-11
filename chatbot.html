@@ -351,6 +351,18 @@
   .scroll-down-btn.show { display: flex; }
   .scroll-down-btn:hover { opacity: 0.85; transform: translateY(1px); }
 
+  .scroll-up-btn {
+    position: absolute; bottom: 3.2rem; right: 1.2rem; z-index: 20;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--bg-elev-2); color: var(--text-muted);
+    border: 1px solid var(--border-strong);
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: opacity 0.2s, transform 0.2s;
+    font-size: 1rem;
+  }
+  .scroll-up-btn.show { display: flex; }
+  .scroll-up-btn:hover { opacity: 0.85; transform: translateY(-1px); color: var(--text); }
+
   /* User message copy button */
   .msg-row.user { flex-direction: row-reverse; align-self: flex-end; max-width: 75%; width: auto; position: relative; }
   .msg-copy-btn {
@@ -836,7 +848,10 @@
       <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);" id="apiKeyLabel">Anthropic API Key</label>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);" />
     </div>
-    <button class="modal-btn" onclick="saveKey()">Start chatting →</button>
+    <div style="display:flex;gap:0.6rem;margin-top:0.25rem;">
+      <button class="modal-btn" onclick="saveKey()" style="flex:1;">Start chatting →</button>
+      <button id="modalCancelBtn" onclick="cancelProviderChange()" style="display:none;padding:0.75rem 1rem;border:1px solid var(--border-strong);border-radius:var(--r-md);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.9rem;white-space:nowrap;transition:all 0.15s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text-muted)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border-strong)'">Keep current</button>
+    </div>
     <p class="modal-note">Your key is used only in this browser session — never stored or sent anywhere else. Get a key at <a id="apiConsoleLink" href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
     <p id="providerSpeedNote" class="modal-note" style="display:none;margin-top:0.4rem;color:var(--orange-400);font-size:0.78rem;">⚠️ Note: Gemini Pro and xAI Grok may take 1–2 minutes for large deliverables (RTMs, test plans, full test suites). Consider Gemini Flash or Claude Sonnet for faster responses.</p>
   </div>
@@ -898,6 +913,7 @@
     </div>
 
     <div class="chat-messages" id="chatMessages">
+      <button class="scroll-up-btn" id="scrollUpBtn" onclick="scrollToTop()" title="Scroll to top">↑</button>
       <button class="scroll-down-btn" id="scrollDownBtn" onclick="scrollToBottom()" title="Scroll to latest message">↓</button>
       <div class="msg-row agent">
         <div class="msg-avatar agent">QA</div>
@@ -2376,20 +2392,41 @@ function scrollToBottom() {
   msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' });
 }
 
-// Show/hide scroll-to-bottom button based on scroll position
+function scrollToTop() {
+  const msgs = document.getElementById('chatMessages');
+  msgs.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Show/hide scroll buttons based on scroll position
 (function initScrollBtn() {
   const msgs = document.getElementById('chatMessages');
-  const btn = document.getElementById('scrollDownBtn');
-  if (!msgs || !btn) return;
+  const downBtn = document.getElementById('scrollDownBtn');
+  const upBtn = document.getElementById('scrollUpBtn');
+  if (!msgs) return;
   msgs.addEventListener('scroll', () => {
     const distFromBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight;
-    if (distFromBottom > 200) {
-      btn.classList.add('show');
-    } else {
-      btn.classList.remove('show');
-    }
+    const distFromTop = msgs.scrollTop;
+    // Down arrow: show when scrolled up more than 200px from bottom
+    if (downBtn) downBtn.classList.toggle('show', distFromBottom > 200);
+    // Up arrow: show when scrolled down more than 200px from top
+    if (upBtn) upBtn.classList.toggle('show', distFromTop > 200);
   });
 })();
+
+// Cancel provider change — restore previous key and close modal
+let previousApiKey = '';
+function cancelProviderChange() {
+  if (previousApiKey) {
+    apiKey = previousApiKey;
+    previousApiKey = '';
+  }
+  document.getElementById('apiModal').style.display = 'none';
+  document.getElementById('modalCancelBtn').style.display = 'none';
+  // Restore provider in nav to match the key we kept
+  const savedProvider = localStorage.getItem('ambitqa-provider') || 'anthropic';
+  const navProvider = document.getElementById('providerSelect');
+  if (navProvider) navProvider.value = savedProvider;
+}
 
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
 function sendStarter(msg) { document.getElementById('userInput').value = msg; sendMessage(); }
@@ -2654,6 +2691,7 @@ function onProviderChange() {
   // Clear existing key and prompt for new one when provider changes
   // (only if a key was already entered — not on initial page load)
   if (apiKey) {
+    previousApiKey = apiKey;  // save so Cancel can restore it
     apiKey = '';
     const input = document.getElementById('apiKeyInput');
     if (input) input.value = '';
@@ -2662,6 +2700,9 @@ function onProviderChange() {
     if (errDiv) errDiv.style.display = 'none';
     // Update modal label/placeholder/link for new provider
     updateModalForProvider(p);
+    // Show Cancel button so user can keep current key
+    const cancelBtn = document.getElementById('modalCancelBtn');
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
     // Show modal asking for new provider's key
     document.getElementById('apiModal').style.display = 'flex';
   }
@@ -2696,7 +2737,10 @@ function saveKey() {
   if (navModel) { populateModelSelect('modelSelect', provider); navModel.value = model; }
   localStorage.setItem('ambitqa-provider', provider);
   localStorage.setItem('ambitqa-model', model);
+  previousApiKey = '';  // clear saved key — new key accepted
   document.getElementById('apiModal').style.display = 'none';
+  const cancelBtn = document.getElementById('modalCancelBtn');
+  if (cancelBtn) cancelBtn.style.display = 'none';
   document.getElementById('userInput').focus();
 }
 document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveKey(); });
