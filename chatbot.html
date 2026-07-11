@@ -334,12 +334,39 @@
   .chat-messages {
     flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2rem 2.5rem;
     display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;
+    position: relative;
   }
   .chat-messages::-webkit-scrollbar { width: 6px; }
   .chat-messages::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
 
+  /* Scroll to bottom button */
+  .scroll-down-btn {
+    position: absolute; bottom: 1.2rem; right: 1.2rem; z-index: 20;
+    width: 36px; height: 36px; border-radius: 50%;
+    background: var(--brand-500); color: #fff; border: none;
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25); transition: opacity 0.2s, transform 0.2s;
+    font-size: 1rem;
+  }
+  .scroll-down-btn.show { display: flex; }
+  .scroll-down-btn:hover { opacity: 0.85; transform: translateY(1px); }
+
+  /* User message copy button */
+  .msg-row.user { flex-direction: row-reverse; align-self: flex-end; max-width: 75%; width: auto; position: relative; }
+  .msg-copy-btn {
+    opacity: 0; position: absolute; top: 50%; left: -32px;
+    transform: translateY(-50%);
+    background: var(--bg-elev-2); border: 1px solid var(--border);
+    border-radius: 6px; width: 26px; height: 26px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); transition: opacity 0.15s, color 0.15s, background 0.15s;
+    font-size: 0.75rem;
+  }
+  .msg-row.user:hover .msg-copy-btn { opacity: 1; }
+  .msg-copy-btn:hover { color: var(--brand-400); background: var(--bg-elev); border-color: var(--brand-500); }
+  .msg-copy-btn.copied { color: #22c55e; border-color: #22c55e; }
+
   .msg-row { display: flex; gap: 0.85rem; max-width: 100%; min-width: 0; width: 100%; }
-  .msg-row.user { flex-direction: row-reverse; align-self: flex-end; max-width: 75%; width: auto; }
   .msg-avatar { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     font-size: 0.78rem; font-weight: 700; }
@@ -870,6 +897,7 @@
     </div>
 
     <div class="chat-messages" id="chatMessages">
+      <button class="scroll-down-btn" id="scrollDownBtn" onclick="scrollToBottom()" title="Scroll to latest message">↓</button>
       <div class="msg-row agent">
         <div class="msg-avatar agent">QA</div>
         <div class="msg-content">
@@ -2042,6 +2070,27 @@ function appendMessage(role, html, sourcesHtml = '', rawMarkdown = '') {
   bubble.className = 'msg-bubble';
   bubble.innerHTML = html;
   content.appendChild(bubble);
+
+  // Copy button for user messages
+  if (role === 'user') {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-copy-btn';
+    copyBtn.title = 'Copy message';
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    const rawText = bubble.textContent || bubble.innerText || '';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(rawText).then(() => {
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        }, 1500);
+      });
+    };
+    row.appendChild(copyBtn);
+  }
+
   if (role === 'agent' && rawMarkdown) {
     const toolbar = document.createElement('div');
     toolbar.innerHTML = buildExportToolbar(rawMarkdown);
@@ -2306,6 +2355,26 @@ function pickSuggestion(text) {
 function hideSuggestions() {
   document.getElementById('suggestBox')?.classList.remove('show');
 }
+
+function scrollToBottom() {
+  const msgs = document.getElementById('chatMessages');
+  msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' });
+}
+
+// Show/hide scroll-to-bottom button based on scroll position
+(function initScrollBtn() {
+  const msgs = document.getElementById('chatMessages');
+  const btn = document.getElementById('scrollDownBtn');
+  if (!msgs || !btn) return;
+  msgs.addEventListener('scroll', () => {
+    const distFromBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight;
+    if (distFromBottom > 200) {
+      btn.classList.add('show');
+    } else {
+      btn.classList.remove('show');
+    }
+  });
+})();
 
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
 function sendStarter(msg) { document.getElementById('userInput').value = msg; sendMessage(); }
