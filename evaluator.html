@@ -473,9 +473,11 @@
     <div class="logo">
       <div class="logo-icon">🔬</div>
       <div>
-        <div class="logo-text">AmbitQA Evaluator</div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="logo-text">AmbitQA Evaluator</div>
+          <span style="font-size:0.7rem;font-family:monospace;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-weight:600;">v1.3.1</span>
+        </div>
         <div class="logo-sub">AI Output Quality Scoring Engine</div>
-    <span id="evalVersionBadge" style="font-size:0.7rem;font-family:monospace;color:var(--text2);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px 8px;margin-left:4px;"></span>
       </div>
     </div>
     <div class="header-right">
@@ -506,6 +508,9 @@
         <option value="bdd_gherkin">BDD / Gherkin Scenarios</option>
         <option value="bug_report">Bug Report</option>
         <option value="automation_code">Automation Code</option>
+        <option value="api_test_cases">API Test Cases</option>
+        <option value="security_test_cases">Security Test Cases</option>
+        <option value="performance_test_cases">Performance Test Plan / Script</option>
         <option value="traceability_matrix">Requirements Traceability Matrix</option>
         <option value="test_execution_report">Test Execution Report</option>
         <option value="exit_criteria">Exit Criteria / DoD</option>
@@ -560,7 +565,7 @@
 
 <script>
 // ── Version ──────────────────────────────────────────────────────────────────
-const AMBIT_QA_VERSION = 'v1.2.0'; // bump this before each deploy
+const AMBIT_QA_VERSION = 'v1.3.1'; // bump this before each deploy
 
 // ── Rubrics (embedded) ─────────────────────────────────────────────────────
 const RUBRICS = {
@@ -657,6 +662,39 @@ const RUBRICS = {
       action_items:     { weight: 0.30, description: "Each improvement has an assigned owner and target completion date" },
       format_compliance: { weight: 0.15, description: "Project info header, structured sections, action item table" }
     }
+  },
+  api_test_cases: {
+    label: "API Test Cases",
+    keywords: ["api","endpoint","rest","graphql","http","status code","response body","request","payload","postman","curl","jwt","oauth","bearer","content-type","authorization"],
+    dimensions: {
+      completeness:    { weight: 0.25, description: "Each test has: Endpoint, Method, Headers, Request Body, Expected Status Code, Expected Response Schema, Test Type (positive/negative/auth)" },
+      coverage:        { weight: 0.25, description: "Covers: success paths, error codes (400/401/403/404/500), auth failures, invalid payloads, boundary values, and edge cases" },
+      specificity:     { weight: 0.25, description: "Exact endpoints, sample payloads, expected JSON fields, and status codes — not 'verify the API works'" },
+      auth_coverage:   { weight: 0.15, description: "Authentication and authorization scenarios tested — missing/expired/invalid token cases included" },
+      executability:   { weight: 0.10, description: "Tests runnable in Postman or code with no missing information; base URL and auth setup documented" }
+    }
+  },
+  security_test_cases: {
+    label: "Security Test Cases",
+    keywords: ["owasp","xss","sql injection","csrf","idor","injection","authentication","session","vulnerability","security","penetration","attack","payload","malicious","unauthorized"],
+    dimensions: {
+      owasp_coverage:  { weight: 0.30, description: "Addresses relevant OWASP Top 10 categories for the application type (injection, broken auth, XSS, IDOR, misconfig, etc.)" },
+      attack_specificity: { weight: 0.25, description: "Actual attack vectors/payloads provided (e.g. XSS: &lt;script&gt;alert(1)&lt;/script&gt;, SQLi: ' OR 1=1--, Path traversal: ../../../etc/passwd) — not generic descriptions" },
+      completeness:    { weight: 0.20, description: "Each test has: Vulnerability type, Attack vector, Steps to reproduce, Expected behavior (blocked/sanitized), Severity rating" },
+      boundary_testing: { weight: 0.15, description: "Tests cover all input surfaces: forms, URL params, headers, cookies, API payloads, file uploads" },
+      remediation:     { weight: 0.10, description: "Each test includes expected secure behavior or links to remediation guidance" }
+    }
+  },
+  performance_test_cases: {
+    label: "Performance Test Plan / Script",
+    keywords: ["load test","stress test","spike test","soak test","performance","throughput","latency","response time","concurrent users","k6","jmeter","ramp up","ramp down","vus","think time","percentile","p95","p99","tps","rps"],
+    dimensions: {
+      scenario_coverage: { weight: 0.25, description: "Covers all required scenario types: load (normal), stress (beyond capacity), spike (sudden burst), soak (sustained duration)" },
+      thresholds:        { weight: 0.25, description: "Specific SLA thresholds defined: max response time (p95/p99), error rate %, min throughput (RPS/TPS)" },
+      script_quality:    { weight: 0.25, description: "Runnable script (k6/JMeter/etc.) with realistic think times, ramp-up/ramp-down, and parameterized data" },
+      completeness:      { weight: 0.15, description: "Test plan includes: target environment, test duration, virtual users, endpoints under test, monitoring approach" },
+      reporting:         { weight: 0.10, description: "Expected output metrics defined: latency percentiles, error rate, throughput graphs" }
+    }
   }
 };
 
@@ -677,6 +715,22 @@ const RED_FLAGS = [
   { pattern: /(?:Given|When|Then)[^\n]*\n\s*(?:Given|When|Then)[^\n]*\n\s*(?:Given|When)/i, issue: "Possible duplicate Gherkin keyword sequence" },
   { pattern: /communication is important/i,     issue: "Platitude in lessons learned — needs specific incident" },
   { pattern: /test earlier next time/i,         issue: "Generic lesson — cite a specific event and root cause" },
+  // API testing red flags
+  { pattern: /verify the api works/i,           issue: "Vague API assertion — specify status code and response fields" },
+  { pattern: /check the response/i,             issue: "Vague assertion — specify exact field names and expected values" },
+  { pattern: /YOUR_API_KEY/i,                   issue: "Placeholder API key — replace with parameterized variable" },
+  { pattern: /http:\/\/localhost/i,             issue: "Hardcoded localhost URL — use environment variable" },
+  { pattern: /status.*200.*only/i,              issue: "Only testing 200 — add negative cases (400, 401, 403, 404, 500)" },
+  // Security testing red flags
+  { pattern: /test for xss/i,                  issue: "Vague XSS test — provide actual payload (e.g. &lt;script&gt;alert(1)&lt;/script&gt; or onerror=alert(1))" },
+  { pattern: /test for sql injection/i,         issue: "Vague SQL injection test — provide actual payload (e.g. ' OR 1=1--)" },
+  { pattern: /check for vulnerabilities/i,      issue: "Too generic — specify which OWASP Top 10 category and attack vector" },
+  { pattern: /run a security scan/i,            issue: "Vague — specify tool (Burp Suite, ZAP), scope, and what to look for" },
+  // Performance testing red flags
+  { pattern: /time\.sleep\(\d+\)/,             issue: "Hardcoded sleep — use think time or pacing functions" },
+  { pattern: /test with many users/i,           issue: "Vague load — specify exact virtual user count and ramp-up profile" },
+  { pattern: /performance should be good/i,     issue: "Unmeasurable threshold — specify p95/p99 response time and error rate %" },
+  { pattern: /no (?:p95|p99|percentile|sla|threshold)/i, issue: "Missing SLA thresholds — define max response time and error rate" },
 ];
 
 // ── Type detection ─────────────────────────────────────────────────────────
@@ -948,12 +1002,6 @@ function toggleTheme() {
     if (btn) btn.textContent = saved === 'light' ? '🌙' : '☀️';
   });
 })();
-
-// Set version badge
-document.addEventListener('DOMContentLoaded', () => {
-  const vb = document.getElementById('evalVersionBadge');
-  if (vb) vb.textContent = AMBIT_QA_VERSION;
-});
 
 // ── Pre-fill from AmbitQA chatbot (via sessionStorage) ───────────────────
 window.addEventListener('load', () => {
