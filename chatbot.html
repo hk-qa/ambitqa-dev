@@ -838,6 +838,7 @@
     </div>
     <button class="modal-btn" onclick="saveKey()">Start chatting →</button>
     <p class="modal-note">Your key is used only in this browser session — never stored or sent anywhere else. Get a key at <a id="apiConsoleLink" href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+    <p id="providerSpeedNote" class="modal-note" style="display:none;margin-top:0.4rem;color:var(--orange-400);font-size:0.78rem;">⚠️ Note: Gemini Pro and xAI Grok may take 1–2 minutes for large deliverables (RTMs, test plans, full test suites). Consider Gemini Flash or Claude Sonnet for faster responses.</p>
   </div>
 </div>
 
@@ -2108,15 +2109,29 @@ function appendMessage(role, html, sourcesHtml = '', rawMarkdown = '') {
   msgs.scrollTop = msgs.scrollHeight;
 }
 
+const SLOW_PROVIDERS = { google: true, xai: true, openrouter: true, custom: true };
+let patienceTimer = null;
+
 function showTyping() {
   const msgs = document.getElementById('chatMessages');
   const row = document.createElement('div');
   row.className = 'msg-row agent'; row.id = 'typingRow';
-  row.innerHTML = `<div class="msg-avatar agent">QA</div><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div>`;
+  row.innerHTML = `<div class="msg-avatar agent">QA</div><div style="display:flex;flex-direction:column;gap:0.5rem;"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div><span id="patienceMsg" style="display:none;font-size:0.8rem;color:var(--text-dim);font-style:italic;padding-left:0.25rem;">⏳ Still generating — large artifacts like RTMs and test plans can take 1–2 minutes with some providers. You can wait or click ⏹ Stop to cancel.</span></div>`;
   msgs.appendChild(row);
   msgs.scrollTop = msgs.scrollHeight;
+  // Show patience message after 30 seconds
+  const provider = localStorage.getItem('ambitqa-provider') || 'anthropic';
+  const delay = SLOW_PROVIDERS[provider] ? 20000 : 30000;
+  patienceTimer = setTimeout(() => {
+    const msg = document.getElementById('patienceMsg');
+    if (msg) { msg.style.display = 'block'; msgs.scrollTop = msgs.scrollHeight; }
+  }, delay);
 }
-function hideTyping() { document.getElementById('typingRow')?.remove(); }
+
+function hideTyping() {
+  if (patienceTimer) { clearTimeout(patienceTimer); patienceTimer = null; }
+  document.getElementById('typingRow')?.remove();
+}
 
 async function sendMessage() {
   const input = document.getElementById('userInput');
@@ -2582,7 +2597,7 @@ function updateModalForProvider(p) {
   const input = document.getElementById('apiKeyInput');
   const label = document.getElementById('apiKeyLabel');
   const consoleLink = document.getElementById('apiConsoleLink');
-  const modalTitle = document.getElementById('apiModalTitle');
+  const speedNote = document.getElementById('providerSpeedNote');
   if (input) input.placeholder = PROVIDER_PLACEHOLDERS[p] || 'API key...';
   if (label) label.textContent = (PROVIDER_LABELS[p] || p) + ' API Key';
   if (consoleLink) {
@@ -2590,14 +2605,33 @@ function updateModalForProvider(p) {
     consoleLink.href = url;
     consoleLink.textContent = PROVIDER_CONSOLES[p] || 'console.anthropic.com';
   }
+  // Show speed warning for slower providers
+  if (speedNote) {
+    speedNote.style.display = SLOW_PROVIDERS[p] ? 'block' : 'none';
+  }
 }
 
 function onModalProviderChange() {
   const p = document.getElementById('modalProviderSelect').value;
   populateModelSelect('modalModelSelect', p);
   updateModalForProvider(p);
+  // Sync nav provider select without triggering key-clear flow
   const navProvider = document.getElementById('providerSelect');
-  if (navProvider) { navProvider.value = p; onProviderChange(); }
+  if (navProvider) {
+    navProvider.value = p;
+    // Call provider change side effects (custom input, localStorage) but skip key prompt
+    populateModelSelect('modelSelect', p);
+    const customInput = document.getElementById('customModelInput');
+    const modelSel = document.getElementById('modelSelect');
+    if (p === 'custom') {
+      if (customInput) customInput.classList.add('show');
+      if (modelSel) modelSel.style.display = 'none';
+    } else {
+      if (customInput) customInput.classList.remove('show');
+      if (modelSel) modelSel.style.display = '';
+    }
+    localStorage.setItem('ambitqa-provider', p);
+  }
 }
 
 function onProviderChange() {
@@ -2616,6 +2650,21 @@ function onProviderChange() {
     if (modelSel) modelSel.style.display = '';
   }
   localStorage.setItem('ambitqa-provider', p);
+
+  // Clear existing key and prompt for new one when provider changes
+  // (only if a key was already entered — not on initial page load)
+  if (apiKey) {
+    apiKey = '';
+    const input = document.getElementById('apiKeyInput');
+    if (input) input.value = '';
+    // Clear error banner if showing
+    const errDiv = document.getElementById('apiModalError');
+    if (errDiv) errDiv.style.display = 'none';
+    // Update modal label/placeholder/link for new provider
+    updateModalForProvider(p);
+    // Show modal asking for new provider's key
+    document.getElementById('apiModal').style.display = 'flex';
+  }
 }
 
 function onModelChange() {
