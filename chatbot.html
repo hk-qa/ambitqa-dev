@@ -787,8 +787,9 @@
 <!-- API KEY MODAL -->
 <div class="modal-overlay" id="apiModal">
   <div class="modal">
-    <h2>Welcome to AmbitQA</h2>
-    <p>Your RAG-powered QA assistant grounded in ISTQB Foundation Level, IEEE 829, and STLC methodology.</p>
+    <h2 id="apiModalTitle">Welcome to AmbitQA</h2>
+    <p id="apiModalDesc">Your RAG-powered QA assistant grounded in ISTQB Foundation Level, IEEE 829, and STLC methodology.</p>
+    <div id="apiModalError" style="display:none;background:color-mix(in srgb,var(--rose-400) 12%,transparent);border:1px solid color-mix(in srgb,var(--rose-400) 40%,transparent);color:var(--rose-400);border-radius:var(--r-sm);padding:0.5rem 0.75rem;font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;"></div>
     <div style="margin:1rem 0;display:flex;flex-direction:column;gap:0.6rem;">
       <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">AI Provider</label>
       <select id="modalProviderSelect" onchange="onModalProviderChange()" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);cursor:pointer;">
@@ -809,7 +810,7 @@
       <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);" />
     </div>
     <button class="modal-btn" onclick="saveKey()">Start chatting →</button>
-    <p class="modal-note">Your key is used only in this browser session — never stored or sent anywhere else. Get a key at <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+    <p class="modal-note">Your key is used only in this browser session — never stored or sent anywhere else. Get a key at <a id="apiConsoleLink" href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
   </div>
 </div>
 
@@ -2131,7 +2132,24 @@ async function sendMessage() {
     if (err.name === 'AbortError') {
       appendMessage('agent', `<p style="color:var(--text-muted);font-style:italic;">⏹ Generation stopped.</p>`);
     } else {
-      appendMessage('agent', `<p style="color:var(--rose-400)">Error: ${err.message}. Please check your API key and try again.</p>`);
+      // Show modal with error message for API key issues
+      const isAuthError = err.message.includes('401') || err.message.includes('403') ||
+        err.message.includes('authentication') || err.message.includes('API key') ||
+        err.message.includes('invalid') || err.message.includes('Unauthorized');
+      if (isAuthError) {
+        const errDiv = document.getElementById('apiModalError');
+        if (errDiv) {
+          errDiv.textContent = '⚠️ API key error: ' + err.message + ' — please check your key and try again.';
+          errDiv.style.display = 'block';
+        }
+        // Clear the bad key
+        apiKey = '';
+        const input = document.getElementById('apiKeyInput');
+        if (input) input.value = '';
+        document.getElementById('apiModal').style.display = 'flex';
+      } else {
+        appendMessage('agent', `<p style="color:var(--rose-400)">Error: ${err.message}. Please check your API key and try again.</p>`);
+      }
     }
   }
   btn.disabled = false;
@@ -2465,6 +2483,23 @@ const PROVIDER_PLACEHOLDERS = {
   openrouter: 'sk-or-...',
   custom: 'Your API key...'
 };
+
+function populateModelSelect(selectId, provider) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const models = PROVIDER_MODELS[provider] || [];
+  sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+const PROVIDER_LABELS = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  xai: 'xAI',
+  openrouter: 'OpenRouter',
+  custom: 'Custom'
+};
+
 const PROVIDER_CONSOLES = {
   anthropic: 'console.anthropic.com',
   openai: 'platform.openai.com',
@@ -2474,20 +2509,24 @@ const PROVIDER_CONSOLES = {
   custom: 'your provider console'
 };
 
-function populateModelSelect(selectId, provider) {
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  const models = PROVIDER_MODELS[provider] || [];
-  sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+function updateModalForProvider(p) {
+  const input = document.getElementById('apiKeyInput');
+  const label = document.getElementById('apiKeyLabel');
+  const consoleLink = document.getElementById('apiConsoleLink');
+  const modalTitle = document.getElementById('apiModalTitle');
+  if (input) input.placeholder = PROVIDER_PLACEHOLDERS[p] || 'API key...';
+  if (label) label.textContent = (PROVIDER_LABELS[p] || p) + ' API Key';
+  if (consoleLink) {
+    const url = 'https://' + (PROVIDER_CONSOLES[p] || 'console.anthropic.com');
+    consoleLink.href = url;
+    consoleLink.textContent = PROVIDER_CONSOLES[p] || 'console.anthropic.com';
+  }
 }
 
 function onModalProviderChange() {
   const p = document.getElementById('modalProviderSelect').value;
   populateModelSelect('modalModelSelect', p);
-  const input = document.getElementById('apiKeyInput');
-  if (input) input.placeholder = PROVIDER_PLACEHOLDERS[p] || 'API key...';
-  const label = document.getElementById('apiKeyLabel');
-  if (label) label.textContent = (p.charAt(0).toUpperCase() + p.slice(1)) + ' API Key';
+  updateModalForProvider(p);
   const navProvider = document.getElementById('providerSelect');
   if (navProvider) { navProvider.value = p; onProviderChange(); }
 }
@@ -2550,8 +2589,22 @@ document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.
   const savedModel = localStorage.getItem('ambitqa-model') || 'claude-sonnet-4-6';
   const navProvider = document.getElementById('providerSelect');
   const modalProvider = document.getElementById('modalProviderSelect');
-  if (navProvider) { navProvider.value = savedProvider; populateModelSelect('modelSelect', savedProvider); document.getElementById('modelSelect').value = savedModel; }
-  if (modalProvider) { modalProvider.value = savedProvider; populateModelSelect('modalModelSelect', savedProvider); document.getElementById('modalModelSelect').value = savedModel; }
+  if (navProvider) {
+    navProvider.value = savedProvider;
+    populateModelSelect('modelSelect', savedProvider);
+    const ms = document.getElementById('modelSelect');
+    if (ms) ms.value = savedModel;
+  }
+  if (modalProvider) {
+    modalProvider.value = savedProvider;
+    populateModelSelect('modalModelSelect', savedProvider);
+    const mms = document.getElementById('modalModelSelect');
+    if (mms) mms.value = savedModel;
+  }
+  // Update label, placeholder, and console link to match saved provider
+  updateModalForProvider(savedProvider);
+  // Also sync nav provider change side effects (custom input visibility etc.)
+  if (savedProvider === 'custom') onProviderChange();
 })();
 
 // ─── RESIZABLE SIDEBARS ────────────────────────────────
