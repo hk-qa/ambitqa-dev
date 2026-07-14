@@ -108,6 +108,7 @@
     border: 1px solid var(--border-strong);
     padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;
     text-decoration: none; cursor: pointer;
+    font-family: inherit; line-height: normal;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
   .nav-left .home-badge:hover {
@@ -798,10 +799,11 @@
     </button>
     <span class="nav-badge">ISTQB · IEEE 829 grounded</span>
     <a class="home-badge" href="index.html" title="Go to home page">⌂ Home</a>
+    <button class="home-badge" onclick="openEvaluator()" title="Open the Evaluator to score a previously created artifact" style="cursor:pointer;">🔬 Evaluate Artifact</button>
   </div>
   <div class="logo-wrap">
     <a class="logo" href="index.html">Ambit<span>QA</span></a>
-    <span class="logo-version">v1.3.7</span>
+    <span class="logo-version">v1.3.9</span>
   </div>
   <div class="nav-right">
     <select id="providerSelect" class="nav-select" onchange="onProviderChange()" title="Select AI provider">
