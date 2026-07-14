@@ -2801,6 +2801,11 @@ function saveCustomModel(val) {
 function openEvaluator(rawMd) {
   if (rawMd) {
     try { sessionStorage.setItem('ambitqa_eval_artifact', rawMd); } catch(e) {}
+  } else {
+    // Standalone launch (e.g. top-nav button) with no artifact to pass —
+    // clear any leftover value from an earlier per-response "Evaluate"
+    // click this session, so the Evaluator opens genuinely blank.
+    try { sessionStorage.removeItem('ambitqa_eval_artifact'); } catch(e) {}
   }
   window.open('evaluator.html', '_blank');
 }
