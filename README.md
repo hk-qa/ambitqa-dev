@@ -8,7 +8,7 @@
 🤖 **Chatbot:** [ambitqa.com/chatbot.html](https://ambitqa.com/chatbot.html)
 🔬 **Evaluator:** [ambitqa.com/evaluator.html](https://ambitqa.com/evaluator.html)
 
-Currently at **v1.2.0** — see [Changelog](#-changelog).
+Chatbot currently at **v1.4.2**, Evaluator at **v1.3.5** — see [Changelog](#-changelog).
 
 ---
 
@@ -55,6 +55,7 @@ A separate **evaluator** scores any QA artifact (whether produced by AmbitQA or 
 
 ### 14+ deliverable types
 - **Test plans** (IEEE 829 format)
+- **Risk assessments and risk registers**
 - **Test cases** — tabular and BDD/Gherkin
 - **Bug reports** — full IEEE 829 defect structure
 - **Requirements Traceability Matrices (RTM)**
@@ -76,23 +77,24 @@ A separate **evaluator** scores any QA artifact (whether produced by AmbitQA or 
 
 ### 🔬 Companion evaluator
 A standalone artifact scoring engine (`evaluator.html`) that:
-- Evaluates any QA artifact against 9 weighted rubrics (test plan, test cases, BDD, bug report, automation code, RTM, execution report, exit criteria, lessons learned)
+- Evaluates any QA artifact against **13 weighted rubrics** (test plan, risk assessment/register, test cases, BDD, bug report, automation code, RTM, execution report, exit criteria, lessons learned, API test cases, security test cases, performance test plan/script)
 - Returns **PASS / WARN / FAIL** verdict with dimension-level bar charts
 - Lists the top issues found
 - Generates an improvement prompt you can paste back into the chatbot
 - Pre-scans for red flags before scoring
-- Integrates with the chatbot via the 🔬 Evaluate button on every response
+- Integrates with the chatbot via the 🔬 Evaluate button on every response, or the standalone 🔬 Evaluate Artifact button in the nav bar (for scoring artifacts written anywhere, not just ones the chatbot produced)
+- **Multi-provider on its own terms** — same 5 providers as the chatbot, with per-provider keys remembered separately; launching from the chatbot pre-selects whichever provider/model was active there
 
 ### 🔌 Multi-provider support
 Works with multiple LLM providers — switch on the fly:
 - **Anthropic** (Claude Sonnet 4.6 and other models)
-- **OpenAI** (GPT-4, GPT-4o, GPT-4 Turbo)
-- **Google** (Gemini Pro / Flash)
-- **xAI** (Grok)
+- **OpenAI** (GPT-5.6 family)
+- **Google** (Gemini 2.5 / 3.5)
+- **xAI** (Grok 4.3 and newer)
 - **OpenRouter** (any model on their platform)
 - **Custom endpoint** — bring your own OpenAI-compatible API
 
-Per-provider API keys stored separately in localStorage. Custom model field for any provider.
+Per-provider API keys stored separately (session-only in the chatbot; remembered across sessions in the Evaluator). Custom model and endpoint fields for any provider.
 
 ### 🧭 11 STLC modes
 Each mode has phase-specific quick actions and RAG retrieval boost:
@@ -109,9 +111,10 @@ Each mode has phase-specific quick actions and RAG retrieval boost:
 - **Performance Testing** (k6, JMeter, load/stress/spike/soak)
 
 ### 🎯 Target real applications
-- Set a target URL → agent fetches the page via CORS proxy
+- Set a target URL → agent fetches the page through a dedicated Cloudflare Worker proxy (with public fallback proxies as backup), avoiding the rate-limit flakiness of relying on third-party free proxies alone
 - Extracts forms, buttons, navigation, and structure from the HTML
 - Generates **site-specific deliverables** referencing actual UI elements
+- Heavily bot-protected sites may still decline the fetch — falls back gracefully to URL + description mode, or attach the page's HTML manually for guaranteed results
 
 ### 📎 Multi-modal attachments
 Three attachment paths to give the agent maximum context:
@@ -147,6 +150,8 @@ Cancel in-flight responses via the Stop button (AbortController). Useful when an
 - Indigo/violet brand palette
 - WCAG AAA-compliant text contrast
 - Mode-aware autosuggestions in the chat box (↑↓ navigation, Enter to pick)
+- Scroll-to-top / scroll-to-bottom navigation buttons that track the chat column's actual layout (survive panel resizing and toggling)
+- 🔑 Change Key button — re-enter or fix a key for the active provider without switching away and back
 - Version badge driven by a single constant for clean release management
 - Keyboard-friendly throughout
 
@@ -154,12 +159,13 @@ Cancel in-flight responses via the Stop button (AbortController). Useful when an
 
 ## 🏗 Architecture
 
-**Pure browser-based** — no backend, no database, no server-side code.
+**Pure browser-based** — no backend, no database, no server-side app code (one small Cloudflare Worker handles target-page fetching only).
 
-- Static HTML + vanilla JS + CSS (~2,000 lines)
+- Static HTML + vanilla JS + CSS (chatbot.html ~3,150 lines, evaluator.html ~1,240 lines)
 - Hosted on GitHub Pages
-- Calls Anthropic / OpenAI / Google / xAI / OpenRouter APIs directly via Messages API
-- API keys entered in-browser and never stored or transmitted to any third party
+- Calls Anthropic / OpenAI / Google / xAI / OpenRouter / Custom APIs directly, each in its native request format
+- A dedicated Cloudflare Worker fetches target-page HTML server-side (bypassing browser CORS restrictions) with public proxies as fallback
+- API keys entered in-browser; chatbot keys are session-only, Evaluator keys are remembered per-provider for convenience — never sent to any server other than your selected provider's API
 - Multi-modal request format (images, PDFs as binary; HTML as extracted text context)
 - 48K token output ceiling with truncation detection + continue button
 
@@ -219,16 +225,19 @@ Cancel in-flight responses via the Stop button (AbortController). Useful when an
 
 ### Evaluator
 
-1. Visit the **[evaluator](https://ambitqa.com/evaluator.html)** (or click the 🔬 button in chatbot)
-2. Paste any QA artifact (test plan, test cases, bug report, etc.)
-3. Select the artifact type
-4. Get instant verdict, scores, issues, and improvement prompt
+1. Visit the **[evaluator](https://ambitqa.com/evaluator.html)** directly, or launch it from the chatbot via the 🔬 **Evaluate** button on any response, or the standalone 🔬 **Evaluate Artifact** button in the nav bar (for scoring an artifact you wrote yourself, or from anywhere else)
+2. If launched from the chatbot, the provider/model are pre-selected to match — just add a key for that provider if you haven't already
+3. Paste any QA artifact (test plan, risk assessment, test cases, bug report, etc.)
+4. Select the artifact type (or leave on Auto-detect)
+5. Get instant verdict, scores, issues, and improvement prompt
 
 ---
 
 ## 🔐 Privacy & security
 
-- Your API key is **only used in the browser session** — never sent to any server other than your selected provider's API
+- **Chatbot:** your API key is used only in the browser session — never persisted, never sent anywhere except your selected provider's API
+- **Evaluator:** keys are remembered per-provider in browser `localStorage` for convenience across visits — a deliberate tradeoff for a tool you'll reuse repeatedly; clear your browser storage to remove them
+- **Target URL fetching** routes through a small Cloudflare Worker (operated by the author) that fetches the page server-side to work around browser CORS restrictions — it sees the target URL you enter, not your API key or conversation content, and doesn't log or store anything
 - No analytics, no tracking, no cookies
 - Code is fully open-source — audit it yourself
 - All requests use explicit browser-access opt-ins required by each provider
@@ -264,9 +273,40 @@ Cancel in-flight responses via the Stop button (AbortController). Useful when an
 
 ## 📋 Changelog
 
-### v1.2.0 (current)
+Chatbot and Evaluator now version independently (they ship on their own schedules).
+
+### Chatbot
+
+**v1.4.2**
+- Evaluator launches pre-selected to the chatbot's active provider/model
+
+**v1.4.1**
+- Updated default model IDs for Google, xAI, and OpenAI (previous defaults had been deprecated by their providers)
+
+**v1.4.0**
+- Fixed multi-provider support — previously every request silently went to Anthropic regardless of the selected provider; now properly routes to each provider's native format, including image/PDF handling per provider's actual capabilities
+
+**v1.3.x**
+- Fixed scroll-to-top/scroll-to-bottom navigation buttons through several root causes (DOM timing, viewport-vs-column positioning, panel-toggle staleness) — now tracks the chat layout reliably via ResizeObserver
+- Added dedicated Cloudflare Worker for target-page fetching, replacing sole reliance on free public CORS proxies
+- Added standalone 🔬 Evaluate Artifact button in the nav bar
+- Added 🔑 Change Key button for the active provider
+- Added Risk Assessment as a first-class chatbot deliverable type
+
+### Evaluator
+
+**v1.3.5**
+- Added multi-provider support (previously Anthropic-only), mirroring the chatbot's mechanism, with per-provider key memory and pre-selection when launched from the chatbot
+
+**v1.3.4**
+- Added Risk Assessment / Risk Register rubric (previously these were misclassified into an unrelated rubric by keyword auto-detect)
+
+**v1.3.3**
+- Added API Test Cases, Security Test Cases, and Performance Test Plan/Script rubrics (9 → 12 rubrics)
+
+### v1.2.0
 - Stop generation button (AbortController)
-- Version badge driven by `QA_NEXUS_VERSION` constant
+- Version badge driven by a single constant
 - Custom model field with persistence
 - Custom provider flow with URL validation gating
 - Multiple UX fixes for evaluator and chatbot
@@ -286,16 +326,16 @@ Cancel in-flight responses via the Stop button (AbortController). Useful when an
 
 ## 🐞 Known limitations
 
-- **CORS-blocked sites** — page fetch falls back to URL + description mode (workaround: attach HTML file or screenshot)
+- **Heavily bot-protected sites** — the dedicated Worker proxy handles most sites reliably, but aggressive anti-bot protection (e.g. major e-commerce/search platforms) may still decline the fetch; falls back to URL + description mode (workaround: attach HTML file or screenshot)
 - **Token limits** — very large outputs (~48K tokens) may be truncated; a Continue button resumes the response
 - **No conversation persistence** — refreshing the page clears history (intentional for privacy)
-- **Browser API key** — anyone with access to your browser session can see the key entered in that session (not stored persistently, but visible in JS memory during use)
+- **Browser API key** — anyone with access to your browser can see keys entered; chatbot keys clear when the tab closes, Evaluator keys persist in `localStorage` until manually cleared (see [Privacy & security](#-privacy--security))
 
 ---
 
 ## 📄 License
 
-**Copyright © 2026 Hitesh Khaneja. All rights reserved.**
+**Copyright © 2026 Hitesh Kapur. All rights reserved.**
 
 This code is published for **portfolio demonstration and educational reference**.
 
