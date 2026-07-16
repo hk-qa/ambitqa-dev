@@ -8,7 +8,7 @@
 🤖 **Chatbot:** [ambitqa.com/chatbot.html](https://ambitqa.com/chatbot.html)
 🔬 **Evaluator:** [ambitqa.com/evaluator.html](https://ambitqa.com/evaluator.html)
 
-Chatbot currently at **v1.4.2**, Evaluator at **v1.3.7** — see [Changelog](#-changelog).
+Chatbot currently at **v1.4.2**, Evaluator at **v1.3.8** — see [Changelog](#-changelog).
 
 ---
 
@@ -295,6 +295,10 @@ Chatbot and Evaluator now version independently (they ship on their own schedule
 - Added Risk Assessment as a first-class chatbot deliverable type
 
 ### Evaluator
+
+**v1.3.8**
+- Fixed auto-detect misclassifying documents based on incidental single-word matches (e.g. a Test Plan scored as Bug Report) — now weights keyword frequency instead of mere presence
+- Fixed evaluations failing with a JSON parse error on some models (response was hitting the token limit mid-output) by raising the output ceiling and improving the error message for this case
 
 **v1.3.7**
 - Added ✕ Clear button to reset the artifact text, file selection, type dropdown, and any previous results in one click

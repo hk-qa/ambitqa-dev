@@ -23,6 +23,8 @@ root cause and resolution filled in.
 | DEF-010 | Scroll buttons stale/invisible after panel toggle | Low | chatbot.html | Fixed | v1.3.7 |
 | DEF-011 | Standalone Evaluate launch shows stale artifact from prior session | Low | chatbot.html | Fixed | v1.3.9 |
 | DEF-012 | README copyright name inconsistent with rest of document | Low | README.md | Fixed | — |
+| DEF-013 | Auto-detect misclassifies Test Plan as Bug Report | High | evaluator.html | Fixed | evaluator v1.3.8 |
+| DEF-014 | Evaluation fails with "Unterminated string in JSON" error | Medium | evaluator.html | Fixed | evaluator v1.3.8 |
 
 **Open defects: 0** (as of this writing — add new entries above the line
 when something breaks)
@@ -243,6 +245,61 @@ says "Hitesh Kapur."
 **Resolution:** Corrected to Hitesh Kapur for consistency. *(Flagged to
 the author in case "Khaneja" was intentional for a legal-name reason —
 not confirmed either way.)*
+
+---
+
+### DEF-013 — Auto-detect misclassifies Test Plan as Bug Report
+**Severity:** High · **Component:** evaluator.html · **Fixed in:** evaluator v1.3.8
+
+**Description:** A document explicitly titled "test plan," with repeated
+verbatim mentions of "Test Plan Identifier," "Test Plan ID," etc., was
+auto-detected as "Bug Report" and scored FAIL (0/100) against completely
+inapplicable criteria (Steps to Reproduce, Severity Rationale, and so on).
+
+**Root cause:** Same underlying class of bug as DEF-002. `detectType()`
+counted keyword *presence* (boolean: does this keyword appear anywhere,
+yes/no) rather than *frequency*. This means a document repeating "test
+plan" five times scored no higher on that signal than a document
+mentioning it once — while a single incidental match on a generic word
+shared with an unrelated rubric (e.g., "environment," which any test
+plan's Environmental Needs section would naturally contain, is also a
+Bug Report keyword) counted equally toward that other rubric. With
+enough small generic-word overlaps, an unrelated rubric could edge out
+the correct one even though the document's actual dominant, repeated
+signal pointed clearly elsewhere.
+
+**Resolution:** Changed scoring from a boolean presence check to counting
+total occurrences of each keyword. Verified via simulation: a
+reconstructed version of the failing document (deliberately including a
+couple of incidental "environment"/"priority" mentions to mirror the
+likely real cause) now correctly classifies as Test Plan, while the
+earlier Risk Assessment fix (DEF-002) and two other spot-checked document
+types (Bug Report, Test Cases) still classify correctly — no regression.
+
+---
+
+### DEF-014 — Evaluation fails with "Unterminated string in JSON" error
+**Severity:** Medium · **Component:** evaluator.html · **Fixed in:** evaluator v1.3.8
+
+**Description:** Explicitly selecting "Test Plan" as the type (bypassing
+auto-detect) and evaluating via Google/Gemini 2.5 Flash failed outright
+with `Evaluation failed: Unterminated string in JSON at position 193
+(line 6 column 106)` instead of returning a score.
+
+**Root cause:** `max_tokens`/`maxOutputTokens` was hardcoded to 1500
+across all providers. The expected JSON response includes a rationale
+per scoring dimension, a top-issues list, and a full improvement prompt
+— verbose enough that some models (apparently including Gemini 2.5
+Flash on this response) can exceed 1500 tokens before finishing, cutting
+the JSON off mid-string. `JSON.parse()` on a truncated string throws
+exactly this "unterminated string" class of error.
+
+**Resolution:** Raised the token ceiling to 2500 across all three
+provider branches (Anthropic, Google, OpenAI-compatible). As
+defense-in-depth, also improved the error message shown for this
+specific failure signature ("unterminated string" / "unexpected end of
+JSON input") to explain what likely happened and suggest retrying or
+switching models, rather than surfacing the raw JS parser error text.
 
 ---
 
