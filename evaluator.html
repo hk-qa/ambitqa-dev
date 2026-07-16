@@ -112,6 +112,21 @@
     gap: 10px;
   }
 
+  .header-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 6px 8px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .header-select:focus { border-color: var(--accent); }
+  .header-select.custom-hidden { display: none; }
+
   .api-key-wrap {
     display: flex;
     align-items: center;
@@ -475,7 +490,7 @@
       <div>
         <div style="display:flex;align-items:center;gap:6px;">
           <div class="logo-text">AmbitQA Evaluator</div>
-          <span style="font-size:0.7rem;font-family:monospace;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-weight:600;">v1.3.3</span>
+          <span style="font-size:0.7rem;font-family:monospace;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-weight:600;">v1.3.5</span>
         </div>
         <div class="logo-sub">AI Output Quality Scoring Engine</div>
       </div>
@@ -487,6 +502,17 @@
         display: flex; align-items: center; justify-content: center;
         color: var(--text2); transition: background 0.15s;
       ">☀️</button>
+      <select id="providerSelect" class="header-select" onchange="onProviderChange()" title="Select AI provider">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="google">Google</option>
+        <option value="xai">xAI</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="custom">Custom</option>
+      </select>
+      <select id="modelSelect" class="header-select" title="Select model"></select>
+      <input type="text" id="customModelInput" class="header-select custom-hidden" placeholder="model-name..." title="Enter custom model name" style="width:120px;">
+      <input type="text" id="customEndpointInput" class="header-select custom-hidden" placeholder="https://your-endpoint/v1/chat/completions" title="Custom OpenAI-compatible endpoint URL" style="width:220px;">
       <div class="api-key-wrap">
         <label>API Key</label>
         <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
@@ -504,6 +530,7 @@
       <select id="artifactType">
         <option value="auto">Auto-detect</option>
         <option value="test_plan">Test Plan</option>
+        <option value="risk_assessment">Risk Assessment / Risk Register</option>
         <option value="test_cases">Test Cases</option>
         <option value="bdd_gherkin">BDD / Gherkin Scenarios</option>
         <option value="bug_report">Bug Report</option>
@@ -565,7 +592,7 @@
 
 <script>
 // ── Version ──────────────────────────────────────────────────────────────────
-const AMBIT_QA_VERSION = 'v1.3.3'; // bump this before each deploy
+const AMBIT_QA_VERSION = 'v1.3.5'; // bump this before each deploy
 
 // ── Rubrics (embedded) ─────────────────────────────────────────────────────
 const RUBRICS = {
@@ -672,6 +699,17 @@ const RUBRICS = {
       specificity:     { weight: 0.25, description: "Exact endpoints, sample payloads, expected JSON fields, and status codes — not 'verify the API works'" },
       auth_coverage:   { weight: 0.15, description: "Authentication and authorization scenarios tested — missing/expired/invalid token cases included" },
       executability:   { weight: 0.10, description: "Tests runnable in Postman or code with no missing information; base URL and auth setup documented" }
+    }
+  },
+  risk_assessment: {
+    label: "Risk Assessment / Risk Register",
+    keywords: ["risk assessment","risk register","risk id","risk category","risk level","likelihood","mitigation strategy","risk matrix","probability","contingency"],
+    dimensions: {
+      risk_coverage:      { weight: 0.30, description: "Risks span multiple realistic categories for the system type (auth/security, data integrity, performance, third-party/integration, business logic, compliance) — not narrowly clustered in one theme" },
+      rating_rigor:       { weight: 0.25, description: "Likelihood and Impact are each independently justified with a concrete reason, not just assigned H/M/L with no rationale; Risk Level is a defensible function of the two" },
+      mitigation_quality: { weight: 0.20, description: "Mitigation strategies are specific and actionable (named control, owner, or approach) — not generic filler like 'monitor closely' or 'test thoroughly'" },
+      completeness:       { weight: 0.15, description: "Every risk row has: Risk ID, Category, Description, Likelihood, Impact, Risk Level, Mitigation Strategy — no blank or placeholder fields" },
+      format_compliance:  { weight: 0.10, description: "IEEE 829 §9-aligned structure (Risks and Contingencies); consistent table format, document header/ID present" }
     }
   },
   security_test_cases: {
@@ -821,17 +859,175 @@ Return ONLY a valid JSON object — no markdown fences, no preamble, no explanat
 }
 
 // ── Main evaluation ────────────────────────────────────────────────────────
+// ── Provider/model selection (mirrors chatbot.html's mechanism) ───────────
+// NOTE: keep this list in sync with PROVIDER_MODELS in chatbot.html — model
+// IDs verified current as of July 2026; providers deprecate/rename these
+// every few months, so re-verify if you start seeing 404s.
+const PROVIDER_MODELS = {
+  anthropic: ['claude-sonnet-4-6','claude-opus-4-5','claude-haiku-4-5'],
+  openai: ['gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna'],
+  google: ['gemini-2.5-pro','gemini-2.5-flash','gemini-3.5-flash'],
+  xai: ['grok-4.3','grok-4.1-fast'],
+  openrouter: ['openai/gpt-5.6-sol','anthropic/claude-sonnet-4-6','google/gemini-2.5-pro'],
+  custom: ['custom-model']
+};
+const PROVIDER_PLACEHOLDERS = {
+  anthropic: 'sk-ant-...',
+  openai: 'sk-...',
+  google: 'AIza...',
+  xai: 'xai-...',
+  openrouter: 'sk-or-...',
+  custom: 'Your API key...'
+};
+const PROVIDER_LABELS = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  xai: 'xAI',
+  openrouter: 'OpenRouter',
+  custom: 'Custom'
+};
+// Anthropic endpoint used directly; OpenAI-compatible providers share the
+// chat-completions format; Google and Custom are built dynamically at call
+// time (Google needs model+key in the URL; Custom's URL is user-supplied).
+const PROVIDER_ENDPOINTS = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  xai: 'https://api.x.ai/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+};
+
+function populateModelSelect(provider) {
+  const sel = document.getElementById('modelSelect');
+  const models = PROVIDER_MODELS[provider] || [];
+  sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function getCurrentModel() {
+  const provider = document.getElementById('providerSelect').value;
+  if (provider === 'custom') {
+    return document.getElementById('customModelInput').value.trim() || 'custom-model';
+  }
+  return document.getElementById('modelSelect').value || PROVIDER_MODELS[provider]?.[0];
+}
+
+function getCustomEndpointUrl() {
+  return document.getElementById('customEndpointInput').value.trim()
+    || localStorage.getItem('ambitqa-custom-endpoint') // shared with chatbot.html (same origin)
+    || '';
+}
+
+// Each provider's key is remembered separately (they're different services,
+// a key for one is meaningless for another) — mirrors chatbot's per-provider
+// key model, but persisted here (unlike chatbot's session-only key), matching
+// the Evaluator's existing "remember my key" convenience for repeat use.
+function loadKeyForProvider(provider) {
+  const saved = localStorage.getItem(`ambitqa-evaluator-key-${provider}`) || '';
+  document.getElementById('apiKey').value = saved;
+  document.getElementById('apiKey').placeholder = PROVIDER_PLACEHOLDERS[provider] || 'API key...';
+}
+
+function onProviderChange() {
+  const provider = document.getElementById('providerSelect').value;
+  populateModelSelect(provider);
+  const customModelInput = document.getElementById('customModelInput');
+  const customEndpointInput = document.getElementById('customEndpointInput');
+  const modelSelect = document.getElementById('modelSelect');
+  if (provider === 'custom') {
+    customModelInput.classList.remove('custom-hidden');
+    customEndpointInput.classList.remove('custom-hidden');
+    customEndpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || '';
+    modelSelect.style.display = 'none';
+  } else {
+    customModelInput.classList.add('custom-hidden');
+    customEndpointInput.classList.add('custom-hidden');
+    modelSelect.style.display = '';
+  }
+  loadKeyForProvider(provider);
+  localStorage.setItem('ambitqa-evaluator-provider', provider);
+}
+
+// Single-shot multi-provider call for scoring. Simpler than chatbot.html's
+// callLLM: no conversation history, no multimodal — just one system-style
+// instruction set + one user turn (the artifact), expecting a single JSON
+// text response back.
+async function callEvaluatorLLM(provider, model, apiKey, systemPrompt, userContent) {
+  let raw;
+
+  if (provider === 'anthropic') {
+    const resp = await fetch(PROVIDER_ENDPOINTS.anthropic, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model, max_tokens: 1500, system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }]
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    raw = data.content.map(b => b.text || '').join('');
+
+  } else if (provider === 'google') {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userContent }] }],
+        generationConfig: { maxOutputTokens: 1500 }
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  } else {
+    // OpenAI-compatible: openai, xai, openrouter, custom
+    const endpoint = provider === 'custom' ? getCustomEndpointUrl() : PROVIDER_ENDPOINTS[provider];
+    if (!endpoint) throw new Error('No endpoint configured. Please enter a Custom Endpoint URL.');
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model, max_tokens: 1500,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }]
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    raw = data.choices?.[0]?.message?.content || '';
+  }
+
+  return raw;
+}
+
 async function runEvaluation() {
   // Strip non-ASCII characters that cause "non ISO-8859-1 code point" fetch header error
   const apiKey = document.getElementById('apiKey').value
     .trim()
     .replace(/[^\x20-\x7E]/g, '');
+  const provider = document.getElementById('providerSelect').value;
+  const model = getCurrentModel();
   const text   = document.getElementById('artifactText').value.trim();
   const typeEl = document.getElementById('artifactType');
   let   type   = typeEl.value;
 
-  if (!apiKey) { alert('Please enter your Anthropic API key (sk-ant-…).'); return; }
-  if (!apiKey.startsWith('sk-')) { alert('API key looks wrong — it should start with sk-ant-…\n\nCheck for stray characters or spaces.'); return; }
+  if (!apiKey) { alert(`Please enter your ${PROVIDER_LABELS[provider] || provider} API key.`); return; }
   if (!text)   { alert('Please paste a QA artifact to evaluate.'); return; }
 
   if (type === 'auto') type = detectType(text);
@@ -844,29 +1040,8 @@ async function runEvaluation() {
   document.getElementById('evaluateBtn').disabled = true;
 
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1500,
-        system: buildSystemPrompt(rubric),
-        messages: [{ role: 'user', content: `ARTIFACT TYPE: ${rubric.label}\n\nARTIFACT:\n${text}` }]
-      })
-    });
-
-    if (!resp.ok) {
-      const err = await resp.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
-    }
-
-    const data = await resp.json();
-    const raw  = data.content.map(b => b.text || '').join('');
+    const userContent = `ARTIFACT TYPE: ${rubric.label}\n\nARTIFACT:\n${text}`;
+    const raw = await callEvaluatorLLM(provider, model, apiKey, buildSystemPrompt(rubric), userContent);
     const clean = raw.replace(/```json|```/g, '').trim();
     const result = JSON.parse(clean);
 
@@ -1005,11 +1180,38 @@ function toggleTheme() {
 
 // ── Pre-fill from AmbitQA chatbot (via sessionStorage) ───────────────────
 window.addEventListener('load', () => {
-  // Restore API key from evaluator's own localStorage (persists across evaluations)
-  const savedKey = localStorage.getItem('ambitqa-evaluator-key') || '';
-  if (savedKey) {
-    document.getElementById('apiKey').value = savedKey;
+  // One-time migration: the old single ambitqa-evaluator-key becomes the
+  // anthropic-specific key (that was the only provider this ever supported),
+  // so nobody's already-saved key silently disappears.
+  const legacyKey = localStorage.getItem('ambitqa-evaluator-key');
+  if (legacyKey && !localStorage.getItem('ambitqa-evaluator-key-anthropic')) {
+    localStorage.setItem('ambitqa-evaluator-key-anthropic', legacyKey);
   }
+
+  // Provider/model: prefer whatever chatbot.html had active when it launched
+  // this tab (passed via sessionStorage, which browsers carry over to a
+  // window.open'd same-origin tab); otherwise fall back to the Evaluator's
+  // own last-used provider/model; otherwise default to Anthropic.
+  const sessionProvider = sessionStorage.getItem('ambitqa_eval_provider');
+  const sessionModel = sessionStorage.getItem('ambitqa_eval_model');
+  const provider = sessionProvider || localStorage.getItem('ambitqa-evaluator-provider') || 'anthropic';
+
+  document.getElementById('providerSelect').value = provider;
+  populateModelSelect(provider);
+  if (provider === 'custom') {
+    document.getElementById('customModelInput').classList.remove('custom-hidden');
+    document.getElementById('customEndpointInput').classList.remove('custom-hidden');
+    document.getElementById('customEndpointInput').value = localStorage.getItem('ambitqa-custom-endpoint') || '';
+    document.getElementById('modelSelect').style.display = 'none';
+    if (sessionModel) document.getElementById('customModelInput').value = sessionModel;
+  } else if (sessionModel && PROVIDER_MODELS[provider]?.includes(sessionModel)) {
+    document.getElementById('modelSelect').value = sessionModel;
+  }
+  loadKeyForProvider(provider);
+  // Consume once — don't re-apply chatbot's provider/model on a manual refresh
+  // after the user may have deliberately switched providers in the Evaluator.
+  sessionStorage.removeItem('ambitqa_eval_provider');
+  sessionStorage.removeItem('ambitqa_eval_model');
 
   const artifact = sessionStorage.getItem('ambitqa_eval_artifact');
   if (artifact) {
@@ -1024,11 +1226,12 @@ window.addEventListener('load', () => {
   }
 });
 
-// Persist key to localStorage when user enters/changes it
+// Persist key to localStorage (per-provider) when user enters/changes it
 document.getElementById('apiKey').addEventListener('change', function() {
   const clean = this.value.trim().replace(/[^\x20-\x7E]/g, '');
   this.value = clean;
-  if (clean) localStorage.setItem('ambitqa-evaluator-key', clean);
+  const provider = document.getElementById('providerSelect').value;
+  if (clean) localStorage.setItem(`ambitqa-evaluator-key-${provider}`, clean);
 });
 
 // ── Keyboard shortcut: Ctrl+Enter ─────────────────────────────────────────
