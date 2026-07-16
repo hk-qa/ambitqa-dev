@@ -102,7 +102,7 @@
     border: 1px solid color-mix(in srgb, var(--brand-500) 25%, transparent);
     padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;
   }
-  .nav-left .home-badge {
+  .home-badge {
     font-size: 0.75rem; color: var(--text-muted);
     background: var(--bg-elev-2);
     border: 1px solid var(--border-strong);
@@ -111,7 +111,7 @@
     font-family: inherit; line-height: normal;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
   }
-  .nav-left .home-badge:hover {
+  .home-badge:hover {
     background: var(--bg-elev); color: var(--text);
     border-color: var(--brand-500);
   }
@@ -803,7 +803,7 @@
   </div>
   <div class="logo-wrap">
     <a class="logo" href="index.html">Ambit<span>QA</span></a>
-    <span class="logo-version">v1.3.9</span>
+    <span class="logo-version">v1.4.0</span>
   </div>
   <div class="nav-right">
     <select id="providerSelect" class="nav-select" onchange="onProviderChange()" title="Select AI provider">
@@ -820,6 +820,8 @@
       <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
     </select>
     <input type="text" id="customModelInput" class="custom-model-input" placeholder="model-name..." title="Enter custom model name" onchange="saveCustomModel(this.value)" />
+    <input type="text" id="customEndpointInput" class="custom-model-input" placeholder="https://your-endpoint/v1/chat/completions" title="Enter custom OpenAI-compatible endpoint URL" onchange="saveCustomEndpoint(this.value)" style="min-width:220px;" />
+    <button class="home-badge" onclick="openKeyModalForCurrentProvider()" title="Change or re-enter the API key for the current provider" style="cursor:pointer;">🔑 Change Key</button>
     <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">
       <svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       <svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
@@ -854,6 +856,11 @@
       </select>
       <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);" id="apiKeyLabel">Anthropic API Key</label>
       <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);" />
+      <div id="modalCustomEndpointWrap" style="display:none;flex-direction:column;gap:0.4rem;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">Custom Endpoint URL</label>
+        <input type="text" id="modalCustomEndpointInput" placeholder="https://your-endpoint/v1/chat/completions" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);" />
+        <p class="modal-note" style="margin:0;">Assumed OpenAI-compatible (chat completions format). Sent as <code>Authorization: Bearer &lt;key&gt;</code>.</p>
+      </div>
     </div>
     <div style="display:flex;gap:0.6rem;margin-top:0.25rem;">
       <button class="modal-btn" onclick="saveKey()" style="flex:1;">Start chatting →</button>
@@ -1360,7 +1367,69 @@ INSTRUCTIONS:
 }
 
 // ─── API CALL ──────────────────────────────────────────
-async function callClaude(userMessage, attachments = []) {
+function getCurrentModel() {
+  if (activeProvider === 'custom') {
+    return document.getElementById('customModelInput')?.value?.trim() || 'custom-model';
+  }
+  const sel = document.getElementById('modelSelect');
+  return (sel && sel.value) || PROVIDER_MODELS[activeProvider]?.[0] || 'claude-sonnet-4-6';
+}
+
+function getCustomEndpointUrl() {
+  return document.getElementById('customEndpointInput')?.value?.trim()
+    || localStorage.getItem('ambitqa-custom-endpoint')
+    || '';
+}
+
+// Converts the canonical (Anthropic-shaped) conversationHistory into the
+// OpenAI-compatible "messages" array used by OpenAI, xAI, OpenRouter, and
+// any custom OpenAI-compatible endpoint.
+function toOpenAIMessages(systemPrompt, history) {
+  const messages = [{ role: 'system', content: systemPrompt }];
+  for (const turn of history) {
+    if (typeof turn.content === 'string') {
+      messages.push({ role: turn.role, content: turn.content });
+      continue;
+    }
+    // Array of Anthropic-style blocks — convert each to OpenAI's equivalent.
+    // Note: standard OpenAI-compatible chat completions has no raw-PDF block;
+    // rather than silently dropping it, swap in a visible text note so the
+    // model (and anyone reading the transcript) knows content was omitted.
+    const parts = [];
+    for (const block of turn.content) {
+      if (block.type === 'text') parts.push({ type: 'text', text: block.text });
+      else if (block.type === 'image') {
+        parts.push({ type: 'image_url', image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` } });
+      } else if (block.type === 'document') {
+        parts.push({ type: 'text', text: "[PDF attachment omitted — not supported by this provider's API. Try Anthropic or Google, or describe the relevant content in text.]" });
+      }
+    }
+    messages.push({ role: turn.role, content: parts });
+  }
+  return messages;
+}
+
+// Converts the canonical conversationHistory into Gemini's "contents" array.
+// Gemini uses role "model" instead of "assistant", and inline_data (base64)
+// for both images and PDFs — Gemini natively supports inline PDF data, so
+// unlike the OpenAI-compatible path, PDFs pass through fully here.
+function toGeminiContents(history) {
+  return history.map(turn => {
+    const role = turn.role === 'assistant' ? 'model' : 'user';
+    if (typeof turn.content === 'string') {
+      return { role, parts: [{ text: turn.content }] };
+    }
+    const parts = turn.content.map(block => {
+      if (block.type === 'text') return { text: block.text };
+      if (block.type === 'image') return { inline_data: { mime_type: block.source.media_type, data: block.source.data } };
+      if (block.type === 'document') return { inline_data: { mime_type: 'application/pdf', data: block.source.data } };
+      return { text: '' };
+    });
+    return { role, parts };
+  });
+}
+
+async function callLLM(userMessage, attachments = []) {
   const queryForRetrieval = userMessage || 'analyze the attached content';
   const chunks = retrieve(queryForRetrieval, currentMode);
 
@@ -1370,7 +1439,8 @@ async function callClaude(userMessage, attachments = []) {
 
   const systemPrompt = buildSystemPrompt(chunks, currentMode, htmlAttachments);
 
-  // Build user message content
+  // Build user message content (canonical Anthropic-block shape — converted
+  // per-provider at request-build time below, via toOpenAIMessages/toGeminiContents)
   let content;
   if (mediaAttachments.length > 0) {
     content = [];
@@ -1400,19 +1470,65 @@ async function callClaude(userMessage, attachments = []) {
 
   conversationHistory.push({ role: 'user', content });
   currentAbortController = new AbortController();
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    signal: currentAbortController.signal,
-    headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
-    body: JSON.stringify({ model:'claude-sonnet-4-6', max_tokens:48000, system:systemPrompt, messages:conversationHistory })
-  });
-  if (!response.ok) {
-    const err = await response.json().catch(() => ({}));
-    throw new Error(err.error?.message || `API error ${response.status}`);
+
+  const provider = activeProvider;
+  const model = getCurrentModel();
+  let text, wasTruncated;
+
+  if (provider === 'anthropic') {
+    const response = await fetch(PROVIDER_ENDPOINTS.anthropic, {
+      method: 'POST',
+      signal: currentAbortController.signal,
+      headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({ model, max_tokens:48000, system:systemPrompt, messages:conversationHistory })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+    const data = await response.json();
+    text = data.content?.[0]?.text || '';
+    wasTruncated = data.stop_reason === 'max_tokens';
+
+  } else if (provider === 'google') {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      signal: currentAbortController.signal,
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: toGeminiContents(conversationHistory),
+        generationConfig: { maxOutputTokens: 8192 }
+      })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+    const data = await response.json();
+    text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    wasTruncated = data.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+
+  } else {
+    // OpenAI-compatible: openai, xai, openrouter, custom
+    const endpoint = provider === 'custom' ? getCustomEndpointUrl() : PROVIDER_ENDPOINTS[provider];
+    if (!endpoint) throw new Error('No endpoint configured for this provider. Please enter a Custom Endpoint URL.');
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      signal: currentAbortController.signal,
+      headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, max_tokens: 8192, messages: toOpenAIMessages(systemPrompt, conversationHistory) })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+    const data = await response.json();
+    text = data.choices?.[0]?.message?.content || '';
+    wasTruncated = data.choices?.[0]?.finish_reason === 'length';
   }
-  const data = await response.json();
-  const text = data.content?.[0]?.text || '';
-  const wasTruncated = data.stop_reason === 'max_tokens';
+
   conversationHistory.push({ role: 'assistant', content: text });
   return { text, chunks, wasTruncated };
 }
@@ -2189,7 +2305,7 @@ async function sendMessage() {
   document.getElementById('stopBtn').style.display = 'flex';
   showTyping();
   try {
-    const { text: reply, chunks, wasTruncated } = await callClaude(text, attachments);
+    const { text: reply, chunks, wasTruncated } = await callLLM(text, attachments);
     hideTyping();
     const { html, sourcesHtml, rawMarkdown } = renderMarkdown(reply);
     const seenSrc = new Set();
@@ -2478,17 +2594,47 @@ if (document.readyState === 'loading') {
 
 // Cancel provider change — restore previous key and close modal
 let previousApiKey = '';
+let previousProvider = '';
+// Tracks which provider the in-memory apiKey actually belongs to — read by
+// callLLM() so an in-progress (unconfirmed) provider switch in the UI never
+// causes a request to be sent under the wrong provider's key/endpoint.
+let activeProvider = 'anthropic';
 function cancelProviderChange() {
   if (previousApiKey) {
     apiKey = previousApiKey;
     previousApiKey = '';
   }
+  if (previousProvider) {
+    activeProvider = previousProvider;
+    previousProvider = '';
+  }
   document.getElementById('apiModal').style.display = 'none';
   document.getElementById('modalCancelBtn').style.display = 'none';
-  // Restore provider in nav to match the key we kept
-  const savedProvider = localStorage.getItem('ambitqa-provider') || 'anthropic';
+  // Restore provider/model in nav + localStorage to match the key we kept.
+  // (previousProvider was captured before onProviderChange's localStorage
+  // write, so this correctly reverts — reading localStorage here directly
+  // would incorrectly show the provider being switched to, not away from.)
+  const restoredProvider = activeProvider;
+  localStorage.setItem('ambitqa-provider', restoredProvider);
   const navProvider = document.getElementById('providerSelect');
-  if (navProvider) navProvider.value = savedProvider;
+  const navModel = document.getElementById('modelSelect');
+  if (navProvider) navProvider.value = restoredProvider;
+  if (navModel) {
+    populateModelSelect('modelSelect', restoredProvider);
+    const savedModel = localStorage.getItem('ambitqa-model');
+    if (savedModel) navModel.value = savedModel;
+  }
+  const modalProvider = document.getElementById('modalProviderSelect');
+  if (modalProvider) { modalProvider.value = restoredProvider; populateModelSelect('modalModelSelect', restoredProvider); }
+  const customInput = document.getElementById('customModelInput');
+  const endpointInput = document.getElementById('customEndpointInput');
+  if (restoredProvider === 'custom') {
+    if (customInput) customInput.classList.add('show');
+    if (endpointInput) endpointInput.classList.add('show');
+  } else {
+    if (customInput) customInput.classList.remove('show');
+    if (endpointInput) endpointInput.classList.remove('show');
+  }
 }
 
 function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
@@ -2677,6 +2823,17 @@ const PROVIDER_MODELS = {
   openrouter: ['openai/gpt-4o','anthropic/claude-sonnet-4-6','google/gemini-pro'],
   custom: ['custom-model']
 };
+// Native/direct endpoints. Google and Custom are built dynamically at call
+// time (Google needs the model + key in the URL; Custom's URL is user-supplied).
+const PROVIDER_ENDPOINTS = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  xai: 'https://api.x.ai/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+};
+function saveCustomEndpoint(val) {
+  if (val) localStorage.setItem('ambitqa-custom-endpoint', val.trim());
+}
 const PROVIDER_PLACEHOLDERS = {
   anthropic: 'sk-ant-...',
   openai: 'sk-...',
@@ -2727,6 +2884,13 @@ function updateModalForProvider(p) {
   if (speedNote) {
     speedNote.style.display = SLOW_PROVIDERS[p] ? 'block' : 'none';
   }
+  // Show the Custom Endpoint URL field only when Custom is selected
+  const endpointWrap = document.getElementById('modalCustomEndpointWrap');
+  const endpointInput = document.getElementById('modalCustomEndpointInput');
+  if (endpointWrap) endpointWrap.style.display = (p === 'custom') ? 'flex' : 'none';
+  if (endpointInput && p === 'custom') {
+    endpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || '';
+  }
 }
 
 function onModalProviderChange() {
@@ -2740,12 +2904,15 @@ function onModalProviderChange() {
     // Call provider change side effects (custom input, localStorage) but skip key prompt
     populateModelSelect('modelSelect', p);
     const customInput = document.getElementById('customModelInput');
+    const endpointInput = document.getElementById('customEndpointInput');
     const modelSel = document.getElementById('modelSelect');
     if (p === 'custom') {
       if (customInput) customInput.classList.add('show');
+      if (endpointInput) { endpointInput.classList.add('show'); endpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || ''; }
       if (modelSel) modelSel.style.display = 'none';
     } else {
       if (customInput) customInput.classList.remove('show');
+      if (endpointInput) endpointInput.classList.remove('show');
       if (modelSel) modelSel.style.display = '';
     }
     localStorage.setItem('ambitqa-provider', p);
@@ -2757,21 +2924,25 @@ function onProviderChange() {
   populateModelSelect('modelSelect', p);
   const modalProvider = document.getElementById('modalProviderSelect');
   if (modalProvider) { modalProvider.value = p; populateModelSelect('modalModelSelect', p); }
-  // Show custom model text input when "custom" selected
+  // Show custom model/endpoint inputs when "custom" selected
   const customInput = document.getElementById('customModelInput');
+  const endpointInput = document.getElementById('customEndpointInput');
   const modelSel = document.getElementById('modelSelect');
   if (p === 'custom') {
     if (customInput) customInput.classList.add('show');
+    if (endpointInput) { endpointInput.classList.add('show'); endpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || ''; }
     if (modelSel) modelSel.style.display = 'none';
   } else {
     if (customInput) customInput.classList.remove('show');
+    if (endpointInput) endpointInput.classList.remove('show');
     if (modelSel) modelSel.style.display = '';
   }
-  localStorage.setItem('ambitqa-provider', p);
 
   // Clear existing key and prompt for new one when provider changes
   // (only if a key was already entered — not on initial page load)
   if (apiKey) {
+    previousProvider = activeProvider;  // capture BEFORE localStorage is overwritten below, so Cancel can restore the exact prior provider
+    localStorage.setItem('ambitqa-provider', p);
     previousApiKey = apiKey;  // save so Cancel can restore it
     apiKey = '';
     const input = document.getElementById('apiKeyInput');
@@ -2786,7 +2957,39 @@ function onProviderChange() {
     if (cancelBtn) cancelBtn.style.display = 'inline-block';
     // Show modal asking for new provider's key
     document.getElementById('apiModal').style.display = 'flex';
+  } else {
+    localStorage.setItem('ambitqa-provider', p);
   }
+}
+
+// Opens the API key modal for whichever provider is currently selected in
+// the nav — for re-entering/fixing a key without needing to switch providers
+// away and back. The key field is intentionally left blank (keys are never
+// persisted, matching the existing session-only security model).
+function openKeyModalForCurrentProvider() {
+  const p = document.getElementById('providerSelect')?.value || 'anthropic';
+  const modalProvider = document.getElementById('modalProviderSelect');
+  if (modalProvider) {
+    modalProvider.value = p;
+    populateModelSelect('modalModelSelect', p);
+    const mm = document.getElementById('modalModelSelect');
+    if (mm) {
+      const currentModel = (p === 'custom')
+        ? (document.getElementById('customModelInput')?.value || 'custom-model')
+        : (document.getElementById('modelSelect')?.value || PROVIDER_MODELS[p]?.[0]);
+      if (currentModel && PROVIDER_MODELS[p]?.includes(currentModel)) mm.value = currentModel;
+    }
+  }
+  updateModalForProvider(p);
+  const errDiv = document.getElementById('apiModalError');
+  if (errDiv) errDiv.style.display = 'none';
+  const input = document.getElementById('apiKeyInput');
+  if (input) input.value = '';
+  // If there's already a working key, remember it so "Keep current" can restore it
+  if (apiKey) { previousApiKey = apiKey; previousProvider = activeProvider; }
+  const cancelBtn = document.getElementById('modalCancelBtn');
+  if (cancelBtn) cancelBtn.style.display = apiKey ? 'inline-block' : 'none';
+  document.getElementById('apiModal').style.display = 'flex';
 }
 
 function onModelChange() {
@@ -2813,10 +3016,18 @@ function openEvaluator(rawMd) {
 function saveKey() {
   const val = document.getElementById('apiKeyInput').value.trim();
   if (!val) { alert('Please enter an API key.'); return; }
-  apiKey = val;
-  // Sync provider/model from modal to nav
   const provider = document.getElementById('modalProviderSelect')?.value || 'anthropic';
   const model = document.getElementById('modalModelSelect')?.value || 'claude-sonnet-4-6';
+  if (provider === 'custom') {
+    const endpointVal = document.getElementById('modalCustomEndpointInput')?.value?.trim() || '';
+    if (!endpointVal) { alert('Please enter a Custom Endpoint URL.'); return; }
+    localStorage.setItem('ambitqa-custom-endpoint', endpointVal);
+    const navEndpoint = document.getElementById('customEndpointInput');
+    if (navEndpoint) navEndpoint.value = endpointVal;
+  }
+  apiKey = val;
+  activeProvider = provider;  // the confirmed key now backs this provider
+  // Sync provider/model from modal to nav
   const navProvider = document.getElementById('providerSelect');
   const navModel = document.getElementById('modelSelect');
   if (navProvider) { navProvider.value = provider; }
@@ -2824,6 +3035,7 @@ function saveKey() {
   localStorage.setItem('ambitqa-provider', provider);
   localStorage.setItem('ambitqa-model', model);
   previousApiKey = '';  // clear saved key — new key accepted
+  previousProvider = '';
   document.getElementById('apiModal').style.display = 'none';
   const cancelBtn = document.getElementById('modalCancelBtn');
   if (cancelBtn) cancelBtn.style.display = 'none';
@@ -2835,6 +3047,8 @@ document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.
 (function restoreProviderModel() {
   const savedProvider = localStorage.getItem('ambitqa-provider') || 'anthropic';
   const savedModel = localStorage.getItem('ambitqa-model') || 'claude-sonnet-4-6';
+  const savedEndpoint = localStorage.getItem('ambitqa-custom-endpoint') || '';
+  activeProvider = savedProvider;
   const navProvider = document.getElementById('providerSelect');
   const modalProvider = document.getElementById('modalProviderSelect');
   if (navProvider) {
@@ -2849,6 +3063,9 @@ document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.
     const mms = document.getElementById('modalModelSelect');
     if (mms) mms.value = savedModel;
   }
+  // Restore custom endpoint into both the nav input and the modal input
+  const navEndpoint = document.getElementById('customEndpointInput');
+  if (navEndpoint) navEndpoint.value = savedEndpoint;
   // Update label, placeholder, and console link to match saved provider
   updateModalForProvider(savedProvider);
   // Also sync nav provider change side effects (custom input visibility etc.)
