@@ -8,7 +8,7 @@
 🤖 **Chatbot:** [ambitqa.com/chatbot.html](https://ambitqa.com/chatbot.html)
 🔬 **Evaluator:** [ambitqa.com/evaluator.html](https://ambitqa.com/evaluator.html)
 
-Chatbot currently at **v1.4.2**, Evaluator at **v1.3.5** — see [Changelog](#-changelog).
+Chatbot currently at **v1.4.2**, Evaluator at **v1.3.7** — see [Changelog](#-changelog).
 
 ---
 
@@ -41,7 +41,7 @@ I use **AmbitQA** as my personal force-multiplier to deliver senior-grade QA art
 
 - 💼 **LinkedIn:** [linkedin.com/in/hkapur](https://linkedin.com/in/hkapur)
 - 📧 **Email:** hitesh@ambitqa.com
-- 📅 **Book a 20-minute intro call:** [Calendly link]
+- 📅 **Book a 30-minute intro call:** [calendly.com/hiteshkapur/30min](https://calendly.com/hiteshkapur/30min)
 
 > _Currently accepting up to 2 new engagements per month. Best fit: startups and mid-size teams needing senior QA capacity without a full-time hire._
 
@@ -84,6 +84,7 @@ A standalone artifact scoring engine (`evaluator.html`) that:
 - Pre-scans for red flags before scoring
 - Integrates with the chatbot via the 🔬 Evaluate button on every response, or the standalone 🔬 Evaluate Artifact button in the nav bar (for scoring artifacts written anywhere, not just ones the chatbot produced)
 - **Multi-provider on its own terms** — same 5 providers as the chatbot, with per-provider keys remembered separately; launching from the chatbot pre-selects whichever provider/model was active there
+- Drop a `.txt`/`.md` file, click to browse for one, or paste directly — and a **✕ Clear** button resets the artifact, file selection, and any previous results in one click
 
 ### 🔌 Multi-provider support
 Works with multiple LLM providers — switch on the fly:
@@ -294,6 +295,12 @@ Chatbot and Evaluator now version independently (they ship on their own schedule
 - Added Risk Assessment as a first-class chatbot deliverable type
 
 ### Evaluator
+
+**v1.3.7**
+- Added ✕ Clear button to reset the artifact text, file selection, type dropdown, and any previous results in one click
+
+**v1.3.6**
+- Added click-to-browse file upload (drop zone previously only accepted drag-and-drop)
 
 **v1.3.5**
 - Added multi-provider support (previously Anthropic-only), mirroring the chatbot's mechanism, with per-provider key memory and pre-selection when launched from the chatbot
