@@ -803,7 +803,7 @@
   </div>
   <div class="logo-wrap">
     <a class="logo" href="index.html">Ambit<span>QA</span></a>
-    <span class="logo-version">v1.4.1</span>
+    <span class="logo-version">v1.4.2</span>
   </div>
   <div class="nav-right">
     <select id="providerSelect" class="nav-select" onchange="onProviderChange()" title="Select AI provider">
@@ -3013,6 +3013,13 @@ function openEvaluator(rawMd) {
     // click this session, so the Evaluator opens genuinely blank.
     try { sessionStorage.removeItem('ambitqa_eval_artifact'); } catch(e) {}
   }
+  // Pass along the currently active provider/model so the Evaluator opens
+  // pre-selected to match, rather than defaulting to Anthropic regardless
+  // of what's actually in use here.
+  try {
+    sessionStorage.setItem('ambitqa_eval_provider', activeProvider);
+    sessionStorage.setItem('ambitqa_eval_model', getCurrentModel());
+  } catch(e) {}
   window.open('evaluator.html', '_blank');
 }
 
