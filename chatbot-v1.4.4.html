@@ -1,0 +1,3203 @@
+<!-- AmbitQA chatbot.html — v1.4.4 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>AmbitQA — RAG-Powered QA Assistant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+<script>
+// Apply theme BEFORE render to avoid flash
+(function() {
+  const stored = localStorage.getItem('ambitqa-theme');
+  const theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+})();
+</script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    /* Brand — indigo / violet (theme-independent) */
+    --brand-50:#EEF2FF; --brand-100:#E0E7FF; --brand-200:#C7D2FE;
+    --brand-300:#A5B4FC; --brand-400:#818CF8; --brand-500:#6366F1;
+    --brand-600:#4F46E5; --brand-700:#4338CA; --brand-800:#3730A3;
+    --brand-900:#312E81;
+    --violet-400:#A78BFA; --violet-500:#8B5CF6; --violet-600:#7C3AED;
+    --amber-300:#FCD34D; --rose-400:#FB7185;
+    --orange-400:#FB923C; --orange-500:#F97316;
+
+    --font-d: 'Space Grotesk', sans-serif;
+    --font-b: 'Inter', sans-serif;
+    --r-sm: 6px; --r-md: 10px; --r-lg: 16px;
+  }
+
+  [data-theme="dark"] {
+    --bg: #0B0B1A;
+    --bg-elev: #14142B;
+    --bg-elev-2: #1E1E3F;
+    --bg-input: #0F0F22;
+    --text: #E8E9F3;
+    --text-muted: #DCDFEE;
+    --text-dim: #B5B8D2;
+    --border: rgba(255,255,255,0.07);
+    --border-strong: rgba(255,255,255,0.15);
+    --bubble-agent-bg: #14142B;
+    --bubble-agent-text: #D8DAEC;
+    --bubble-user-bg: #4338CA;
+    --bubble-user-text: #E0E7FF;
+    --code-bg: #07071A;
+    --code-text: #C7CCE5;
+    --table-head-bg: rgba(99,102,241,0.1);
+    --table-head-text: #C7D2FE;
+    --table-row-alt: rgba(255,255,255,0.02);
+    --nav-bg: rgba(11,11,26,0.92);
+    --shadow: 0 4px 16px rgba(0,0,0,0.3);
+  }
+
+  [data-theme="light"] {
+    --bg: #FAFAFD;
+    --bg-elev: #FFFFFF;
+    --bg-elev-2: #F4F4FB;
+    --bg-input: #FFFFFF;
+    --text: #1E1B3A;
+    --text-muted: #2A2542;
+    --text-dim: #3D3958;
+    --border: rgba(30,27,58,0.08);
+    --border-strong: rgba(30,27,58,0.15);
+    --bubble-agent-bg: #FFFFFF;
+    --bubble-agent-text: #1E1B3A;
+    --bubble-user-bg: #6366F1;
+    --bubble-user-text: #FFFFFF;
+    --code-bg: #F4F4FB;
+    --code-text: #2D2B4A;
+    --table-head-bg: #EEF2FF;
+    --table-head-text: #4338CA;
+    --table-row-alt: #FAFAFD;
+    --nav-bg: rgba(250,250,253,0.92);
+    --shadow: 0 4px 12px rgba(30,27,58,0.06);
+  }
+
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-b); background: var(--bg); color: var(--text);
+    font-size: 16px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    display: flex; flex-direction: column;
+    transition: background 0.2s, color 0.2s;
+  }
+
+  /* NAV */
+  nav {
+    display: grid; grid-template-columns: auto 1fr auto; align-items: center;
+    padding: 0 1rem; height: 64px; flex-shrink: 0;
+    background: var(--nav-bg); backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 50;
+  }
+  .nav-left { display: flex; align-items: center; gap: 0.5rem; }
+  .nav-left .nav-badge {
+    font-size: 0.75rem; color: var(--brand-400);
+    background: color-mix(in srgb, var(--brand-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand-500) 25%, transparent);
+    padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;
+  }
+  .home-badge {
+    font-size: 0.75rem; color: var(--text-muted);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border-strong);
+    padding: 0.2rem 0.6rem; border-radius: 999px; font-weight: 600;
+    text-decoration: none; cursor: pointer;
+    font-family: inherit; line-height: normal;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .home-badge:hover {
+    background: var(--bg-elev); color: var(--text);
+    border-color: var(--brand-500);
+  }
+  .logo-wrap {
+    display: flex; align-items: center; gap: 0.4rem;
+    justify-self: center; text-align: center;
+  }
+  .logo-version {
+    font-size: 0.7rem; color: var(--text-dim);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    padding: 0.15rem 0.45rem; border-radius: 999px; font-weight: 600;
+    font-family: 'Menlo', monospace;
+    align-self: center; margin-top: 0.1rem;
+  }
+  .logo {
+    font-family: var(--font-d); font-weight: 800; font-size: 1.8rem;
+    color: var(--text); text-decoration: none; letter-spacing: -0.03em;
+  }
+  .logo span { background: linear-gradient(135deg, var(--brand-500), var(--violet-500)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .nav-right { display: flex; align-items: center; gap: 0.5rem; justify-self: end; }
+  .nav-badge {
+    font-size: 0.78rem; color: var(--brand-400);
+    background: color-mix(in srgb, var(--brand-500) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand-500) 25%, transparent);
+    padding: 0.25rem 0.75rem; border-radius: 999px; font-weight: 600;
+  }
+  .version-badge {
+    font-size: 0.72rem; color: var(--text-dim);
+    background: var(--bg-elev-2);
+    border: 1px solid var(--border);
+    padding: 0.2rem 0.55rem; border-radius: 999px; font-weight: 600;
+    font-family: 'Menlo', monospace;
+  }
+  .nav-select {
+    font-size: 0.8rem; color: var(--text);
+    background: var(--bg-elev); border: 1px solid var(--border);
+    border-radius: var(--r-sm); padding: 0.3rem 0.6rem;
+    cursor: pointer; max-width: 140px;
+  }
+  .nav-select:hover { border-color: var(--border-strong); }
+  .custom-model-input {
+    font-size: 0.8rem; color: var(--text);
+    background: var(--bg-elev); border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm); padding: 0.3rem 0.6rem;
+    width: 140px; display: none;
+  }
+  .custom-model-input.show { display: block; }
+  .theme-toggle {
+    width: 34px; height: 34px; border-radius: var(--r-sm);
+    background: transparent; border: 1px solid var(--border);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .theme-toggle:hover { background: var(--bg-elev-2); color: var(--text); border-color: var(--border-strong); }
+  .theme-toggle svg { width: 17px; height: 17px; }
+
+  /* PANEL TOGGLES */
+  .panel-toggle {
+    width: 36px; height: 36px; border-radius: var(--r-sm);
+    background: transparent; border: 1px solid var(--border);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted); transition: all 0.15s;
+  }
+  .panel-toggle:hover { background: var(--bg-elev-2); color: var(--text); border-color: var(--border-strong); }
+  .panel-toggle.active {
+    background: color-mix(in srgb, var(--brand-500) 15%, transparent);
+    color: var(--brand-400);
+    border-color: color-mix(in srgb, var(--brand-500) 50%, transparent);
+  }
+  .panel-toggle svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+  .sidebar.collapsed, .resize-handle.collapsed { display: none !important; }
+  .back-link { font-size: 0.85rem; color: var(--text-muted); text-decoration: none; }
+  .back-link:hover { color: var(--text); }
+
+  /* APP LAYOUT */
+  .app { display: flex; flex: 1; overflow: hidden; }
+
+  .sidebar {
+    flex-shrink: 0; background: var(--bg-elev);
+    display: flex; flex-direction: column; overflow-y: auto;
+    transition: background 0.2s;
+  }
+  .sidebar.left { border-right: 1px solid var(--border); width: 280px; }
+  .sidebar.right { border-left: 1px solid var(--border); width: 290px; }
+  .sidebar::-webkit-scrollbar { width: 4px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+
+  /* RESIZE HANDLES */
+  .resize-handle {
+    width: 5px; flex-shrink: 0; cursor: col-resize;
+    background: transparent; position: relative; transition: background 0.15s;
+  }
+  .resize-handle:hover, .resize-handle.dragging {
+    background: color-mix(in srgb, var(--brand-500) 30%, transparent);
+  }
+  .resize-handle::before {
+    content: ''; position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%); width: 2px; height: 32px;
+    background: var(--border-strong); border-radius: 2px; opacity: 0;
+    transition: opacity 0.15s;
+  }
+  .resize-handle:hover::before { opacity: 1; background: var(--brand-500); }
+
+  .sidebar-section { padding: 1rem; border-bottom: 1px solid var(--border); }
+  .sidebar-label {
+    font-size: 0.72rem; color: var(--text-muted); text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 600; margin-bottom: 0.75rem;
+  }
+
+  .mode-btn {
+    display: block; width: 100%; text-align: left;
+    padding: 0.55rem 0.85rem; border-radius: var(--r-sm);
+    font-size: 0.88rem; color: var(--text); background: transparent;
+    border: 1px solid transparent; cursor: pointer; font-family: var(--font-b);
+    transition: all 0.15s; margin-bottom: 0.35rem; font-weight: 500;
+  }
+  .mode-btn:hover { background: var(--bg-elev-2); border-color: var(--border); }
+  .mode-btn.active {
+    background: color-mix(in srgb, var(--brand-500) 12%, transparent);
+    border-color: color-mix(in srgb, var(--brand-500) 30%, transparent);
+    color: var(--brand-400);
+  }
+  .mode-btn .mode-phase {
+    font-size: 0.72rem; color: var(--text-dim);
+    display: block; margin-top: 0.15rem; font-weight: 400;
+  }
+  .mode-btn.active .mode-phase { color: var(--brand-500); }
+
+  .action-btn {
+    display: flex; width: 100%; text-align: left;
+    padding: 0.55rem 0.75rem; border-radius: var(--r-sm);
+    font-size: 0.82rem; color: var(--text);
+    background: color-mix(in srgb, var(--brand-500) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand-500) 18%, transparent);
+    cursor: pointer; font-family: var(--font-b);
+    transition: all 0.15s; margin-bottom: 0.45rem; line-height: 1.45;
+    align-items: flex-start; gap: 0.45rem;
+  }
+  .action-btn:hover {
+    background: color-mix(in srgb, var(--brand-500) 14%, transparent);
+    border-color: color-mix(in srgb, var(--brand-500) 40%, transparent);
+  }
+  .action-btn .action-arrow { color: var(--brand-400); font-size: 0.9rem; flex-shrink: 0; margin-top: 0.05rem; }
+
+  .source-item {
+    font-size: 0.8rem; color: var(--text-muted);
+    padding: 0.35rem 0; border-bottom: 1px solid var(--border); line-height: 1.45;
+  }
+  .source-item:last-child { border-bottom: none; }
+  .source-item strong { color: var(--brand-400); font-weight: 500; }
+
+  /* TARGET PANEL (now in right sidebar) */
+  .target-panel { padding: 1rem; border-bottom: 1px solid var(--border); }
+  .target-panel input[type=text], .target-panel textarea {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm); padding: 0.55rem 0.8rem;
+    font-size: 0.85rem; color: var(--text); font-family: var(--font-b);
+    outline: none; transition: border-color 0.15s; margin-bottom: 0.5rem;
+  }
+  .target-panel input[type=text]:focus, .target-panel textarea:focus {
+    border-color: color-mix(in srgb, var(--brand-500) 60%, transparent);
+  }
+  .target-panel textarea { resize: vertical; min-height: 54px; line-height: 1.4; }
+  .target-actions { display: flex; gap: 0.4rem; }
+  .target-fetch-btn {
+    flex: 1; background: var(--brand-500); color: #fff; border: none;
+    padding: 0.55rem 0.7rem; border-radius: var(--r-sm);
+    font-size: 0.82rem; font-weight: 500; cursor: pointer;
+    font-family: var(--font-b); transition: background 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 0.3rem;
+  }
+  .target-fetch-btn:hover { background: var(--brand-600); }
+  .target-fetch-btn:disabled { background: var(--text-dim); cursor: not-allowed; }
+  .target-clear-btn {
+    background: transparent; color: var(--text-muted); border: 1px solid var(--border);
+    padding: 0.55rem 0.7rem; border-radius: var(--r-sm);
+    font-size: 0.82rem; cursor: pointer; font-family: var(--font-b); transition: all 0.15s;
+  }
+  .target-clear-btn:hover { color: var(--text); border-color: var(--border-strong); }
+  .target-status {
+    font-size: 0.78rem; line-height: 1.55; margin-top: 0.5rem;
+    padding: 0.55rem 0.7rem; border-radius: var(--r-sm); display: none;
+  }
+  .target-status.show { display: block; }
+  .target-status.success { background: color-mix(in srgb, var(--brand-500) 10%, transparent); border: 1px solid color-mix(in srgb, var(--brand-500) 30%, transparent); color: var(--brand-400); }
+  .target-status.partial { background: color-mix(in srgb, var(--rose-400) 12%, transparent); border: 1px solid color-mix(in srgb, var(--rose-400) 50%, transparent); color: var(--rose-400); font-weight: 500; }
+  .target-status.error { background: color-mix(in srgb, var(--rose-400) 10%, transparent); border: 1px solid color-mix(in srgb, var(--rose-400) 30%, transparent); color: var(--rose-400); }
+  .target-status.loading { background: color-mix(in srgb, var(--violet-500) 10%, transparent); border: 1px solid color-mix(in srgb, var(--violet-500) 30%, transparent); color: var(--violet-400); }
+
+  .target-banner {
+    display: none; align-items: center; gap: 0.6rem;
+    padding: 0.55rem 2rem;
+    background: color-mix(in srgb, var(--brand-500) 12%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-500) 25%, transparent);
+    font-size: 0.85rem; color: var(--brand-400); flex-shrink: 0;
+  }
+  .target-banner.show { display: flex; }
+  .target-banner-url { color: var(--text); font-weight: 500; text-decoration: none; }
+  .target-banner-url:hover { text-decoration: underline; }
+  .target-banner-mode { margin-left: auto; font-size: 0.78rem; color: var(--text-muted); }
+
+  /* CHAT */
+  .chat-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; min-width: 0; }
+  .mode-bar {
+    display: flex; align-items: center; gap: 0.7rem;
+    padding: 0.65rem 2rem;
+    background: color-mix(in srgb, var(--brand-500) 8%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--brand-500) 20%, transparent);
+    font-size: 0.85rem; color: var(--brand-400); flex-shrink: 0;
+  }
+  .mode-bar-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--brand-500); animation: pulse 2s infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .mode-bar-label { font-weight: 600; }
+  .mode-bar-desc { color: var(--text-muted); }
+
+  .chat-messages {
+    flex: 1; overflow-y: auto; overflow-x: hidden; padding: 2rem 2.5rem;
+    display: flex; flex-direction: column; gap: 1.5rem; min-width: 0;
+  }
+  .chat-messages::-webkit-scrollbar { width: 6px; }
+  .chat-messages::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+  /* Scroll buttons - position:fixed as a base, but `right` and `bottom`
+     are both set dynamically via JS (see initScrollBtn/reposition in the
+     main script). This keeps them pinned to the chat column's actual
+     right edge (not the raw viewport edge, which lands on the right
+     sidebar when open) and clear of the input bar's real height (not a
+     fixed rem guess, which can collide with send/stop as the textarea
+     grows or hints appear). Values below are just the pre-JS fallback. */
+  .scroll-down-btn {
+    position: fixed; bottom: 5.5rem; right: 2rem; z-index: 100;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--brand-500); color: #fff; border: none;
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.3); transition: opacity 0.2s, transform 0.2s;
+    font-size: 1.1rem; line-height: 1;
+  }
+  .scroll-down-btn.show { display: flex; }
+  .scroll-down-btn:hover { opacity: 0.85; transform: translateY(1px); }
+
+  .scroll-up-btn {
+    position: fixed; bottom: 8.5rem; right: 2rem; z-index: 100;
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--bg-elev-2); color: var(--text-muted);
+    border: 1px solid var(--border-strong);
+    cursor: pointer; display: none; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15); transition: opacity 0.2s, transform 0.2s;
+    font-size: 1.1rem; line-height: 1;
+  }
+  .scroll-up-btn.show { display: flex; }
+  .scroll-up-btn:hover { opacity: 0.85; transform: translateY(-1px); color: var(--text); }
+
+  /* User message copy button */
+  .msg-row.user { flex-direction: row-reverse; align-self: flex-end; max-width: 75%; width: auto; position: relative; }
+  .msg-copy-btn {
+    opacity: 0; position: absolute; top: 50%; left: -32px;
+    transform: translateY(-50%);
+    background: var(--bg-elev-2); border: 1px solid var(--border);
+    border-radius: 6px; width: 26px; height: 26px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim); transition: opacity 0.15s, color 0.15s, background 0.15s;
+    font-size: 0.75rem;
+  }
+  .msg-row.user:hover .msg-copy-btn { opacity: 1; }
+  .msg-copy-btn:hover { color: var(--brand-400); background: var(--bg-elev); border-color: var(--brand-500); }
+  .msg-copy-btn.copied { color: #22c55e; border-color: #22c55e; }
+
+  .msg-row { display: flex; gap: 0.85rem; max-width: 100%; min-width: 0; width: 100%; }
+  .msg-avatar { width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.78rem; font-weight: 700; }
+  .msg-avatar.agent { background: linear-gradient(135deg, var(--brand-700), var(--violet-600)); color: #fff; }
+  .msg-avatar.user { background: var(--bg-elev-2); color: var(--text-muted); }
+  .msg-content { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; flex: 1; max-width: 100%; }
+
+  .msg-bubble {
+    padding: 1rem 1.25rem; border-radius: 12px;
+    font-size: 0.95rem; line-height: 1.7;
+    max-width: 100%; min-width: 0;
+  }
+  .msg-row.agent .msg-bubble { width: 100%; }
+  .msg-row.agent .msg-bubble {
+    background: var(--bubble-agent-bg); border: 1px solid var(--border);
+    color: var(--bubble-agent-text); border-radius: 4px 12px 12px 12px;
+    box-shadow: var(--shadow);
+  }
+  .msg-row.user .msg-bubble {
+    background: var(--bubble-user-bg); color: var(--bubble-user-text);
+    border-radius: 12px 4px 12px 12px;
+  }
+  .msg-bubble p { margin-bottom: 0.6rem; }
+  .msg-bubble p:last-child { margin-bottom: 0; }
+  .msg-bubble strong { font-weight: 600; color: var(--text); }
+  .msg-row.user .msg-bubble strong { color: #fff; }
+  .msg-bubble h1, .msg-bubble h2, .msg-bubble h3 { font-family: var(--font-d); line-height: 1.3; color: var(--text); }
+  .msg-bubble h1 { font-size: 1.25rem; margin: 1rem 0 0.6rem; color: var(--brand-400); }
+  .msg-bubble h2 { font-size: 1.1rem; margin: 1rem 0 0.5rem; color: var(--brand-400); }
+  .msg-bubble h3 { font-size: 1rem; margin: 0.7rem 0 0.4rem; }
+  .msg-bubble hr { border: 0; border-top: 1px solid var(--border); margin: 0.8rem 0; }
+  .msg-bubble pre.code-block {
+    background: var(--code-bg); border: 1px solid color-mix(in srgb, var(--brand-500) 20%, transparent);
+    border-radius: 6px; padding: 0.85rem 1.1rem; margin: 0.7rem 0;
+    overflow-x: auto; font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+    font-size: 0.85rem; line-height: 1.6; color: var(--code-text); white-space: pre;
+    max-width: 100%; min-width: 0;
+  }
+  .msg-bubble pre.code-block code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .msg-bubble blockquote {
+    margin: 0.7rem 0; padding: 0.6rem 0.9rem;
+    background: color-mix(in srgb, var(--brand-500) 6%, transparent);
+    border-left: 3px solid var(--brand-500);
+    border-radius: 0 6px 6px 0; color: var(--text-muted); font-size: 0.92rem;
+  }
+  .msg-bubble ul, .msg-bubble ol { padding-left: 1.4rem; margin: 0.5rem 0; }
+  .msg-bubble li { margin-bottom: 0.3rem; }
+  .msg-bubble table {
+    width: 100%; border-collapse: collapse; font-size: 0.88rem; margin: 0.7rem 0;
+    background: var(--bg-elev-2); border-radius: 6px; overflow: hidden;
+    table-layout: auto;
+  }
+  .msg-bubble th {
+    color: var(--table-head-text); font-weight: 600; text-align: left;
+    padding: 0.55rem 0.7rem; border-bottom: 1px solid var(--border-strong);
+    background: var(--table-head-bg); font-size: 0.85rem;
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  .msg-bubble td {
+    color: var(--text); padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border); vertical-align: top;
+    word-break: break-word; overflow-wrap: anywhere;
+  }
+  .msg-bubble tr:nth-child(even) td { background: var(--table-row-alt); }
+  .msg-bubble code {
+    background: var(--code-bg); padding: 0.12rem 0.4rem; border-radius: 3px;
+    font-size: 0.88rem; font-family: monospace; color: var(--code-text);
+  }
+
+  /* EXPORT TOOLBAR */
+  .export-toolbar { display: flex; gap: 0.5rem; flex-wrap: wrap; padding-top: 0.4rem; }
+  .export-btn {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    font-size: 0.78rem; background: transparent;
+    border: 1px solid var(--border-strong); color: var(--text-muted);
+    padding: 0.35rem 0.75rem; border-radius: var(--r-sm);
+    cursor: pointer; font-family: var(--font-b); transition: all 0.15s; font-weight: 500;
+  }
+  .export-btn:hover {
+    background: color-mix(in srgb, var(--brand-500) 10%, transparent);
+    border-color: color-mix(in srgb, var(--brand-500) 40%, transparent);
+    color: var(--brand-400);
+  }
+  .export-btn.jira:hover { background: color-mix(in srgb, var(--brand-500) 10%, transparent); border-color: color-mix(in srgb, var(--brand-500) 40%, transparent); color: var(--brand-400); }
+  .export-btn.evaluate-btn {
+    background: color-mix(in srgb, var(--violet-500) 10%, transparent);
+    border-color: color-mix(in srgb, var(--violet-500) 30%, transparent);
+    color: var(--violet-400); font-weight: 600;
+  }
+  .export-btn.evaluate-btn:hover { background: color-mix(in srgb, var(--violet-500) 20%, transparent); color: var(--text); }
+  .export-btn svg { width: 12px; height: 12px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+  /* PDF HINT */
+  .pdf-hint {
+    position: relative; display: inline-flex; align-items: center;
+  }
+  .pdf-hint-btn {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    font-size: 0.74rem; background: transparent;
+    border: 1px dashed var(--border-strong); color: var(--text-dim);
+    padding: 0.3rem 0.65rem; border-radius: var(--r-sm);
+    cursor: help; font-family: var(--font-b); transition: all 0.15s;
+  }
+  .pdf-hint-btn:hover { color: var(--brand-400); border-color: color-mix(in srgb, var(--brand-500) 40%, transparent); }
+  .pdf-hint-popup {
+    position: absolute; bottom: calc(100% + 8px); left: 50%;
+    transform: translateX(-50%); width: 320px;
+    background: var(--bg-elev); border: 1px solid var(--border-strong);
+    border-radius: var(--r-md); padding: 0.85rem 1rem;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+    font-size: 0.82rem; line-height: 1.55; color: var(--text);
+    opacity: 0; visibility: hidden; transition: opacity 0.15s, visibility 0.15s;
+    z-index: 20;
+  }
+  .pdf-hint-popup::after {
+    content: ''; position: absolute; top: 100%; left: 50%;
+    transform: translateX(-50%); width: 0; height: 0;
+    border-left: 6px solid transparent; border-right: 6px solid transparent;
+    border-top: 6px solid var(--bg-elev);
+  }
+  .pdf-hint:hover .pdf-hint-popup,
+  .pdf-hint.show .pdf-hint-popup { opacity: 1; visibility: visible; }
+  .pdf-hint-popup strong { color: var(--brand-400); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.04em; display: block; margin-bottom: 0.4rem; }
+  .pdf-hint-popup ol { padding-left: 1.1rem; margin: 0.3rem 0; }
+  .pdf-hint-popup li { margin-bottom: 0.2rem; }
+  .pdf-hint-popup kbd {
+    background: var(--bg-elev-2); border: 1px solid var(--border-strong);
+    border-radius: 3px; padding: 0.05rem 0.35rem; font-size: 0.78rem;
+    font-family: 'Menlo', monospace; color: var(--brand-400);
+  }
+  .pdf-hint-popup .divider { border-top: 1px solid var(--border); margin: 0.55rem 0; }
+
+  .source-chips {
+    display: flex; gap: 0.35rem; flex-wrap: wrap; padding-top: 0.5rem;
+    align-items: center;
+    opacity: 0.7;
+  }
+  .source-chips::before {
+    content: 'Sources:';
+    font-size: 0.68rem; color: var(--text-dim);
+    text-transform: uppercase; letter-spacing: 0.05em;
+    font-weight: 500; margin-right: 0.15rem;
+  }
+  .source-chip {
+    font-size: 0.68rem; background: transparent;
+    border: 1px solid var(--border); color: var(--text-dim);
+    padding: 0.12rem 0.5rem; border-radius: 999px;
+    font-weight: 400;
+  }
+
+  .typing-indicator {
+    display: flex; gap: 4px; align-items: center;
+    padding: 0.75rem 1rem; background: var(--bubble-agent-bg);
+    border: 1px solid var(--border); border-radius: 4px 12px 12px 12px; width: fit-content;
+  }
+  .typing-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand-500); animation: bounce 1.2s infinite; }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes bounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-6px); } }
+
+  /* INPUT */
+  .chat-input-area { padding: 1.2rem 2.5rem 1.5rem; border-top: 1px solid var(--border); background: var(--bg); }
+  .input-row { display: flex; gap: 0.75rem; align-items: center; }
+  .input-wrap { flex: 1; position: relative; display: flex; }
+  textarea {
+    width: 100%; background: var(--bg-input);
+    border: 1px solid var(--border-strong); border-radius: var(--r-md);
+    padding: 0.75rem 1.1rem; font-size: 0.95rem;
+    font-family: var(--font-b); color: var(--text);
+    resize: none; outline: none; line-height: 1.5;
+    min-height: 50px; max-height: 160px; transition: border-color 0.2s;
+    display: block;
+  }
+  textarea::placeholder { color: var(--text-dim); }
+  textarea:focus { border-color: color-mix(in srgb, var(--brand-500) 60%, transparent); }
+  .send-btn {
+    width: 50px; height: 50px; border-radius: var(--r-md);
+    background: linear-gradient(135deg, var(--brand-500), var(--violet-500));
+    border: none; cursor: pointer; display: flex; align-items: center;
+    justify-content: center; flex-shrink: 0; transition: opacity 0.2s;
+  }
+  .send-btn:hover { opacity: 0.9; }
+  .send-btn:disabled { background: var(--text-dim); cursor: not-allowed; }
+  .send-btn svg { width: 18px; height: 18px; stroke: #fff; stroke-width: 2.5; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .stop-btn {
+    width: 50px; height: 50px; border-radius: var(--r-md); flex-shrink: 0;
+    background: #ef4444; border: none; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; transition: opacity 0.15s;
+  }
+  .stop-btn:hover { opacity: 0.85; }
+  .stop-btn svg { width: 16px; height: 16px; }
+  .input-hint { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.6rem; text-align: center; }
+
+  /* AUTOSUGGEST */
+  .suggest-box {
+    position: absolute; bottom: calc(100% + 6px); left: 0; right: 0;
+    background: var(--bg-elev); border: 1px solid var(--border-strong);
+    border-radius: var(--r-md); box-shadow: 0 -4px 16px rgba(0,0,0,0.15);
+    max-height: 240px; overflow-y: auto; z-index: 30;
+    display: none;
+  }
+  .suggest-box.show { display: block; }
+  .suggest-item {
+    padding: 0.55rem 0.85rem; font-size: 0.88rem;
+    color: var(--text); cursor: pointer; line-height: 1.4;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 0.5rem;
+  }
+  .suggest-item:last-child { border-bottom: none; }
+  .suggest-item:hover, .suggest-item.active {
+    background: color-mix(in srgb, var(--brand-500) 12%, transparent);
+    color: var(--brand-400);
+  }
+  .suggest-item .suggest-arrow { color: var(--brand-400); font-size: 0.85rem; flex-shrink: 0; margin-top: 0.05rem; }
+  .suggest-item .suggest-kbd {
+    margin-left: auto; font-size: 0.72rem; color: var(--text-dim);
+    background: var(--bg-elev-2); padding: 0.05rem 0.35rem; border-radius: 3px;
+    font-family: 'Menlo', monospace; flex-shrink: 0; display: none;
+  }
+  .suggest-item.active .suggest-kbd { display: inline; }
+  .suggest-footer {
+    padding: 0.4rem 0.85rem;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    background: var(--bg-elev-2);
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  .suggest-footer span {
+    font-family: 'Menlo', monospace;
+  }
+
+  .continue-hint {
+    margin-top: 1rem;
+    padding-top: 0.7rem;
+    border-top: 1px dashed var(--border-strong);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.5;
+  }
+  .continue-hint em {
+    color: var(--brand-400);
+    font-style: normal;
+    font-weight: 500;
+    background: color-mix(in srgb, var(--brand-500) 8%, transparent);
+    padding: 0.05rem 0.4rem;
+    border-radius: 3px;
+    margin: 0 0.1rem;
+  }
+
+  /* ATTACHMENTS */
+  .attach-btn {
+    width: 50px; height: 50px; border-radius: var(--r-md);
+    background: var(--bg-elev-2); border: 1px solid var(--border-strong);
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: all 0.2s; color: var(--text-muted);
+  }
+  .attach-btn:hover {
+    background: color-mix(in srgb, var(--brand-500) 12%, transparent);
+    border-color: var(--brand-500); color: var(--brand-400);
+  }
+  .attach-btn svg { width: 20px; height: 20px; stroke: currentColor; stroke-width: 2; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+  .attachment-preview {
+    display: flex; gap: 0.55rem; flex-wrap: wrap;
+    padding: 0.6rem 0.5rem 0; align-items: flex-start;
+  }
+  .attachment-preview:empty { display: none; }
+  .attachment-clear-all {
+    align-self: center; height: 72px; display: flex; align-items: center;
+    gap: 0.3rem; font-size: 0.72rem; font-weight: 600; color: var(--text-muted);
+    background: var(--bg-elev-2); border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm); padding: 0 0.6rem; cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .attachment-clear-all:hover {
+    background: var(--bg-elev); color: var(--text); border-color: var(--brand-500);
+  }
+  .attachment-thumb {
+    position: relative; width: 72px; height: 72px; border-radius: var(--r-sm);
+    overflow: hidden; border: 1px solid var(--border-strong);
+    background: var(--bg-elev-2); flex-shrink: 0;
+  }
+  .attachment-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .attachment-thumb.pdf {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--brand-400); padding: 0.3rem;
+  }
+  .attachment-thumb.pdf svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; margin-bottom: 2px; }
+  .attachment-thumb.pdf .pdf-label { font-size: 0.62rem; font-weight: 700; color: var(--brand-400); }
+  .attachment-thumb.html {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--violet-400); padding: 0.3rem;
+  }
+  .attachment-thumb.html svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; margin-bottom: 2px; }
+  .attachment-thumb.html .pdf-label { font-size: 0.62rem; font-weight: 700; color: var(--violet-400); }
+  .attachment-remove {
+    position: absolute; top: 3px; right: 3px;
+    width: 20px; height: 20px; border-radius: 50%;
+    background: rgba(0,0,0,0.75); color: #fff; border: none;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.85rem; cursor: pointer; line-height: 1;
+    font-family: -apple-system, Helvetica, sans-serif;
+  }
+  .attachment-remove:hover { background: var(--rose-400); }
+  .attachment-name {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.75); color: #fff;
+    font-size: 0.62rem; padding: 1px 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* IMAGES IN CHAT MESSAGES */
+  .msg-images { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+  .msg-image {
+    max-width: 280px; max-height: 200px; border-radius: 8px;
+    border: 1px solid var(--border-strong); cursor: zoom-in;
+    display: block; transition: transform 0.15s;
+  }
+  .msg-image:hover { transform: scale(1.02); }
+  .msg-pdf-tag {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    padding: 0.4rem 0.7rem; background: var(--bg-elev-2);
+    border: 1px solid var(--border-strong); border-radius: var(--r-sm);
+    font-size: 0.82rem; color: var(--brand-400); margin-right: 0.4rem; margin-bottom: 0.4rem;
+  }
+  .msg-pdf-tag svg { width: 14px; height: 14px; stroke: currentColor; stroke-width: 2; fill: none; }
+
+  /* MODAL */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    display: flex; align-items: center; justify-content: center; z-index: 200;
+  }
+  .modal {
+    background: var(--bg-elev); border: 1px solid var(--border-strong);
+    border-radius: var(--r-lg); padding: 2rem; width: 90%; max-width: 440px;
+    box-shadow: var(--shadow);
+  }
+  .modal h2 { font-family: var(--font-d); font-size: 1.15rem; color: var(--text); margin-bottom: 0.5rem; }
+  .modal p { font-size: 0.88rem; color: var(--text-muted); margin-bottom: 1.25rem; line-height: 1.6; }
+  .modal input {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm); padding: 0.7rem 1rem; font-size: 0.9rem;
+    color: var(--text); outline: none; font-family: var(--font-b); margin-bottom: 1rem;
+  }
+  .modal input:focus { border-color: var(--brand-500); }
+  .modal-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--brand-500), var(--violet-500));
+    color: #fff; border: none; padding: 0.75rem;
+    border-radius: var(--r-sm); font-size: 0.92rem; font-weight: 500;
+    cursor: pointer; font-family: var(--font-b); transition: opacity 0.2s;
+  }
+  .modal-btn:hover { opacity: 0.9; }
+  .modal-note { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.75rem; text-align: center; }
+  .modal-note a { color: var(--brand-400); }
+
+  /* TOAST */
+  .toast {
+    position: fixed; bottom: 1.5rem; left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--brand-700); border: 1px solid var(--brand-500);
+    color: #fff; font-size: 0.85rem; font-weight: 500;
+    padding: 0.6rem 1.2rem; border-radius: 999px;
+    transition: transform 0.3s ease, opacity 0.3s ease; opacity: 0;
+    z-index: 100; white-space: nowrap; box-shadow: var(--shadow);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+
+  /* FORM MODAL */
+  .form-modal { max-width: 640px; max-height: 85vh; display: flex; flex-direction: column; padding: 1.5rem; }
+  .form-modal-header { padding-bottom: 1rem; border-bottom: 1px solid var(--border); margin-bottom: 1rem; }
+  .form-modal-fields { flex: 1; overflow-y: auto; padding-right: 0.5rem; }
+  .form-modal-fields::-webkit-scrollbar { width: 4px; }
+  .form-modal-fields::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 2px; }
+  .form-field { margin-bottom: 1.1rem; }
+  .form-field label { display: block; font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.3rem; }
+  .form-field .form-hint { display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0.4rem; font-style: italic; }
+  .form-field textarea, .form-field input {
+    width: 100%; background: var(--bg-input); border: 1px solid var(--border-strong);
+    border-radius: var(--r-sm); padding: 0.55rem 0.8rem;
+    font-size: 0.9rem; color: var(--text); font-family: var(--font-b);
+    outline: none; transition: border-color 0.15s; line-height: 1.5;
+  }
+  .form-field textarea { resize: vertical; min-height: 50px; }
+  .form-field textarea:focus, .form-field input:focus { border-color: var(--brand-500); }
+  .form-modal-actions { display: flex; gap: 0.6rem; padding-top: 1rem; border-top: 1px solid var(--border); margin-top: 0.5rem; }
+  .form-modal-actions .modal-btn { flex: 1; }
+  .form-modal-cancel {
+    background: transparent; color: var(--text-muted); border: 1px solid var(--border-strong);
+    padding: 0.75rem 1.2rem; border-radius: var(--r-sm); font-size: 0.9rem; cursor: pointer;
+    font-family: var(--font-b); transition: all 0.15s;
+  }
+  .form-modal-cancel:hover { color: var(--text); border-color: var(--text-muted); }
+  .export-btn.form-fill {
+    background: color-mix(in srgb, var(--brand-500) 15%, transparent);
+    border-color: color-mix(in srgb, var(--brand-500) 45%, transparent);
+    color: var(--brand-400); font-weight: 600;
+  }
+  .export-btn.form-fill:hover { background: color-mix(in srgb, var(--brand-500) 25%, transparent); color: var(--text); }
+
+  @media (max-width: 1000px) {
+    .sidebar.right, .resize-handle.right { display: none; }
+  }
+  @media (max-width: 700px) {
+    .sidebar.left, .resize-handle.left { display: none; }
+    .chat-messages, .chat-input-area { padding-left: 1.25rem; padding-right: 1.25rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-left">
+    <button class="panel-toggle active" id="leftToggle" onclick="togglePanel('left')" title="Toggle left panel" aria-label="Toggle left panel">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+    </button>
+    <span class="nav-badge">ISTQB · IEEE 829 grounded</span>
+    <a class="home-badge" href="index.html" title="Go to home page">⌂ Home</a>
+    <button class="home-badge" onclick="openEvaluator()" title="Open the Evaluator to score a previously created artifact" style="cursor:pointer;">🔬 Evaluate Artifact</button>
+  </div>
+  <div class="logo-wrap">
+    <a class="logo" href="index.html">Ambit<span>QA</span></a>
+    <span class="logo-version">v1.4.4</span>
+  </div>
+  <div class="nav-right">
+    <select id="providerSelect" class="nav-select" onchange="onProviderChange()" title="Select AI provider">
+      <option value="anthropic">Anthropic</option>
+      <option value="openai">OpenAI</option>
+      <option value="google">Google</option>
+      <option value="xai">xAI</option>
+      <option value="openrouter">OpenRouter</option>
+      <option value="custom">Custom</option>
+    </select>
+    <select id="modelSelect" class="nav-select" onchange="onModelChange()" title="Select model">
+      <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+      <option value="claude-opus-4-5">Claude Opus 4.5</option>
+      <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+    </select>
+    <input type="text" id="customModelInput" class="custom-model-input" placeholder="model-name..." title="Enter custom model name" onchange="saveCustomModel(this.value)" />
+    <input type="text" id="customEndpointInput" class="custom-model-input" placeholder="https://your-endpoint/v1/chat/completions" title="Enter custom OpenAI-compatible endpoint URL" onchange="saveCustomEndpoint(this.value)" style="min-width:220px;" />
+    <button class="home-badge" onclick="openKeyModalForCurrentProvider()" title="Change or re-enter the API key for the current provider" style="cursor:pointer;">🔑 Change Key</button>
+    <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle theme">
+      <svg id="themeIconMoon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none;"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      <svg id="themeIconSun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+    </button>
+    <button class="panel-toggle active" id="rightToggle" onclick="togglePanel('right')" title="Toggle right panel" aria-label="Toggle right panel">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+    </button>
+  </div>
+</nav>
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal">
+    <h2 id="apiModalTitle">Welcome to AmbitQA</h2>
+    <p id="apiModalDesc">Your RAG-powered QA assistant grounded in ISTQB Foundation Level, IEEE 829, and STLC methodology.</p>
+    <div id="apiModalError" style="display:none;background:color-mix(in srgb,var(--rose-400) 12%,transparent);border:1px solid color-mix(in srgb,var(--rose-400) 40%,transparent);color:var(--rose-400);border-radius:var(--r-sm);padding:0.5rem 0.75rem;font-size:0.85rem;font-weight:600;margin-bottom:0.5rem;"></div>
+    <div style="margin:1rem 0;display:flex;flex-direction:column;gap:0.6rem;">
+      <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">AI Provider</label>
+      <select id="modalProviderSelect" onchange="onModalProviderChange()" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);cursor:pointer;">
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI (GPT-4)</option>
+        <option value="google">Google (Gemini)</option>
+        <option value="xai">xAI (Grok)</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="custom">Custom endpoint</option>
+      </select>
+      <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">Model</label>
+      <select id="modalModelSelect" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);cursor:pointer;">
+        <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+        <option value="claude-opus-4-5">Claude Opus 4.5</option>
+        <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+      </select>
+      <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);" id="apiKeyLabel">Anthropic API Key</label>
+      <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);" />
+      <div id="modalCustomEndpointWrap" style="display:none;flex-direction:column;gap:0.4rem;">
+        <label style="font-size:0.85rem;font-weight:600;color:var(--text-muted);">Custom Endpoint URL</label>
+        <input type="text" id="modalCustomEndpointInput" placeholder="https://your-endpoint/v1/chat/completions" style="font-size:0.9rem;padding:0.5rem 0.75rem;border:1px solid var(--border);border-radius:var(--r-sm);background:var(--bg-input);color:var(--text);" />
+        <p class="modal-note" style="margin:0;">Assumed OpenAI-compatible (chat completions format). Sent as <code>Authorization: Bearer &lt;key&gt;</code>.</p>
+      </div>
+    </div>
+    <div style="display:flex;gap:0.6rem;margin-top:0.25rem;">
+      <button class="modal-btn" onclick="saveKey()" style="flex:1;">Start chatting →</button>
+      <button id="modalCancelBtn" onclick="cancelProviderChange()" style="display:none;padding:0.75rem 1rem;border:1px solid var(--border-strong);border-radius:var(--r-md);background:transparent;color:var(--text-muted);cursor:pointer;font-size:0.9rem;white-space:nowrap;transition:all 0.15s;" onmouseover="this.style.color='var(--text)';this.style.borderColor='var(--text-muted)'" onmouseout="this.style.color='var(--text-muted)';this.style.borderColor='var(--border-strong)'">Keep current</button>
+    </div>
+    <p class="modal-note">Your key is used only in this browser session — never stored or sent anywhere else. Get a key at <a id="apiConsoleLink" href="https://console.anthropic.com" target="_blank">console.anthropic.com</a></p>
+    <p id="providerSpeedNote" class="modal-note" style="display:none;margin-top:0.4rem;color:var(--orange-400);font-size:0.78rem;">⚠️ Note: Gemini Pro and xAI Grok may take 1–2 minutes for large deliverables (RTMs, test plans, full test suites). Consider Gemini Flash or Claude Sonnet for faster responses.</p>
+  </div>
+</div>
+
+<!-- FORM-FILL MODAL -->
+<div class="modal-overlay" id="formModal" style="display:none;">
+  <div class="modal form-modal">
+    <div class="form-modal-header">
+      <h2 id="formModalTitle">Fill in the details</h2>
+      <p>The agent will use your answers to generate a structured deliverable.</p>
+    </div>
+    <div class="form-modal-fields" id="formFieldsContainer"></div>
+    <div class="form-modal-actions">
+      <button class="form-modal-cancel" onclick="closeFormModal()">Cancel</button>
+      <button class="modal-btn" onclick="submitFormModal()">Submit answers →</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- LEFT SIDEBAR -->
+  <aside class="sidebar left" id="leftSidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-label">STLC Phase</div>
+      <button class="mode-btn active" onclick="setMode(this,'general')">All Phases<span class="mode-phase">Full STLC coverage</span></button>
+      <button class="mode-btn" onclick="setMode(this,'requirements')">Requirements Review<span class="mode-phase">Testability · RTM</span></button>
+      <button class="mode-btn" onclick="setMode(this,'planning')">Test Planning<span class="mode-phase">Test plan · Strategy</span></button>
+      <button class="mode-btn" onclick="setMode(this,'design')">Test Design<span class="mode-phase">Test cases · BDD</span></button>
+      <button class="mode-btn" onclick="setMode(this,'execution')">Test Execution<span class="mode-phase">Run summary · Reports</span></button>
+      <button class="mode-btn" onclick="setMode(this,'defects')">Defect Management<span class="mode-phase">Bug reports · Triage</span></button>
+      <button class="mode-btn" onclick="setMode(this,'closure')">Test Closure<span class="mode-phase">Summary · Lessons</span></button>
+      <button class="mode-btn" onclick="setMode(this,'automation')">Test Automation<span class="mode-phase">Playwright · Cypress · BDD</span></button>
+      <button class="mode-btn" onclick="setMode(this,'api')">API Testing<span class="mode-phase">REST · GraphQL · JWT</span></button>
+      <button class="mode-btn" onclick="setMode(this,'security')">Security Testing<span class="mode-phase">OWASP · XSS · Injection</span></button>
+      <button class="mode-btn" onclick="setMode(this,'performance')">Performance Testing<span class="mode-phase">k6 · JMeter · Load</span></button>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label" id="actionsLabel">Quick actions</div>
+      <div id="actionsList"></div>
+    </div>
+  </aside>
+
+  <div class="resize-handle left" id="leftHandle"></div>
+
+  <!-- CHAT -->
+  <div class="chat-area">
+    <div class="target-banner" id="targetBanner">
+      <span>🎯 Testing:</span>
+      <a href="#" target="_blank" rel="noopener" class="target-banner-url" id="targetBannerUrl"></a>
+      <span class="target-banner-mode" id="targetBannerMode"></span>
+    </div>
+    <div class="mode-bar">
+      <div class="mode-bar-dot"></div>
+      <span class="mode-bar-label" id="modeBarLabel">All Phases</span>
+      <span class="mode-bar-desc" id="modeBarDesc"> — Full STLC coverage active</span>
+    </div>
+
+    <div class="chat-messages" id="chatMessages">
+      <div class="msg-row agent">
+        <div class="msg-avatar agent">QA</div>
+        <div class="msg-content">
+          <div class="msg-bubble">
+            <p><strong>Welcome to AmbitQA.</strong> Your RAG-powered QA assistant, grounded in ISTQB Foundation Level, IEEE 829, and STLC methodology.</p>
+            <p>👈 <strong>Left panel:</strong> pick an STLC phase, including <strong>Test Automation</strong> for Playwright / Cypress / Selenium / BDD code generation.</p>
+            <p>👉 <strong>Right panel:</strong> target a real application URL so I can produce site-specific deliverables.</p>
+            <p>📎 <strong>Attach:</strong> screenshots, PDFs, or <strong>HTML files</strong> (drag/paste them in). Screenshots help me see the UI; HTML files give me real selectors for working automation code.</p>
+            <p>Every output comes with <strong>TXT · MD · HTML · Jira CSV</strong> export. Drag the dividers to resize each panel — or use the panel toggles in the navbar to hide them.</p>
+          </div>
+          <div class="source-chips"><span class="source-chip">ISTQB FL</span><span class="source-chip">IEEE 829</span><span class="source-chip">STLC</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chat-input-area" id="chatInputArea">
+      <div class="attachment-preview" id="attachmentPreview"></div>
+      <div class="input-row">
+        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/jpg,image/webp,image/gif,application/pdf,text/html,text/xml,application/xml,.html,.htm,.xml" multiple style="display:none;" onchange="handleFileSelect(this.files)" />
+        <button class="attach-btn" onclick="document.getElementById('fileInput').click()" title="Attach screenshots or PDFs">
+          <svg viewBox="0 0 24 24"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <div class="input-wrap">
+          <div class="suggest-box" id="suggestBox"></div>
+          <textarea id="userInput" placeholder="Ask about test cases, bug reports, RTM, test plans…" rows="1" onkeydown="handleKey(event)" oninput="autoResize(this); updateSuggestions(this.value)" onfocus="updateSuggestions(this.value)" onblur="setTimeout(() => hideSuggestions(), 200)"></textarea>
+        </div>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()" aria-label="Send">
+          <svg viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+        <button class="stop-btn" id="stopBtn" onclick="stopGeneration()" aria-label="Stop generation" style="display:none;" title="Stop generation">
+          <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        </button>
+      </div>
+      <div class="input-hint">Shift+Enter for new line · Enter to send · ↑↓ to pick suggestion · 📎 attach screenshots, PDFs, or HTML files</div>
+    </div>
+  </div>
+
+  <div class="resize-handle right" id="rightHandle"></div>
+
+  <!-- RIGHT SIDEBAR -->
+  <aside class="sidebar right" id="rightSidebar">
+    <div class="target-panel">
+      <div class="sidebar-label">🎯 Target Application</div>
+      <input type="text" id="targetUrl" placeholder="example.com or www.example.com" autocomplete="off" />
+      <textarea id="targetDesc" placeholder="Optional: describe the page or feature (e.g. 'login page', 'checkout flow')"></textarea>
+      <div class="target-actions">
+        <button class="target-fetch-btn" id="fetchBtn" onclick="fetchTarget()">
+          <span id="fetchBtnText">Set Target</span>
+        </button>
+        <button class="target-clear-btn" onclick="clearTarget()" title="Clear target">✕</button>
+      </div>
+      <div class="target-status" id="targetStatus"></div>
+      <div style="font-size:0.72rem;color:var(--text-dim);margin-top:0.7rem;line-height:1.5;padding-top:0.6rem;border-top:1px dashed var(--border);">
+        💡 <strong style="color:var(--brand-400);">For automation code:</strong> if CORS blocks the fetch, open DevTools (F12) → right-click the form → <em>Copy outerHTML</em> → save as <code>.html</code> and attach via 📎 (or paste in chat). This gives me real selectors instead of guessing from screenshots.
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Knowledge base</div>
+      <div class="source-item"><strong>ISTQB FL</strong> · Foundation Level syllabus</div>
+      <div class="source-item"><strong>IEEE 829</strong> · Test doc standard</div>
+      <div class="source-item"><strong>STLC</strong> · Phase definitions</div>
+      <div class="source-item"><strong>Test Design</strong> · EP, BVA, decision tables</div>
+      <div class="source-item"><strong>Defect Lifecycle</strong> · Severity & priority</div>
+      <div class="source-item"><strong>BDD / Gherkin</strong> · Scenarios</div>
+      <div class="source-item"><strong>Agile QA</strong> · Shift-left, sprint testing</div>
+      <div class="source-item"><strong>Automation</strong> · Playwright, Cypress, Selenium, POM</div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">About</div>
+      <p style="font-size:0.8rem;color:var(--text-muted);line-height:1.55;">AmbitQA retrieves from a curated methodology knowledge base before answering. Every deliverable references the exact sources used.</p>
+      <p style="font-size:0.78rem;color:var(--text-dim);margin-top:0.6rem;">Built for the Codecademy Agentic AI Bootcamp.</p>
+    </div>
+  </aside>
+</div>
+
+<script>
+// ─── THEME ─────────────────────────────────────────────
+function updateThemeIcon() {
+  const theme = document.documentElement.getAttribute('data-theme');
+  document.getElementById('themeIconMoon').style.display = theme === 'light' ? 'block' : 'none';
+  document.getElementById('themeIconSun').style.display = theme === 'dark' ? 'block' : 'none';
+}
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme');
+  const next = current === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', next);
+  localStorage.setItem('ambitqa-theme', next);
+  updateThemeIcon();
+}
+updateThemeIcon();
+
+// ─── STATE ─────────────────────────────────────────────
+let apiKey = '';
+let currentMode = 'general';
+let conversationHistory = [];
+let targetApp = { url: '', description: '', pageContent: '', fetchStatus: 'none' };
+let currentAbortController = null;
+let pendingAttachments = [];
+
+// ─── ATTACHMENT HANDLING ───────────────────────────────
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function fileToText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsText(file);
+  });
+}
+
+function isHtmlFile(file) {
+  const name = file.name.toLowerCase();
+  return file.type === 'text/html' || file.type === 'text/xml' || file.type === 'application/xml'
+      || name.endsWith('.html') || name.endsWith('.htm') || name.endsWith('.xml');
+}
+
+async function handleFileSelect(files) {
+  for (const file of files) {
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    const isHtml = isHtmlFile(file);
+    if (!isImage && !isPdf && !isHtml) {
+      showToast('Supported: images, PDFs, and HTML files');
+      continue;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      showToast('File too large (max 8 MB): ' + file.name);
+      continue;
+    }
+    if (pendingAttachments.length >= 8) {
+      showToast('Max 8 attachments per message');
+      break;
+    }
+    try {
+      if (isHtml) {
+        const rawHtml = await fileToText(file);
+        const extracted = extractReadableContent(rawHtml);
+        pendingAttachments.push({
+          name: file.name,
+          type: 'text/html',
+          kind: 'html',
+          textContent: extracted,
+          rawSize: rawHtml.length
+        });
+      } else {
+        const base64 = await fileToBase64(file);
+        pendingAttachments.push({
+          name: file.name,
+          type: file.type,
+          kind: isImage ? 'image' : 'pdf',
+          base64: base64,
+          dataUrl: isImage ? `data:${file.type};base64,${base64}` : null
+        });
+      }
+    } catch (e) {
+      showToast('Could not read ' + file.name);
+    }
+  }
+  renderAttachmentPreview();
+  document.getElementById('fileInput').value = '';
+}
+
+function removeAttachment(index) {
+  pendingAttachments.splice(index, 1);
+  renderAttachmentPreview();
+}
+
+function clearAllAttachments() {
+  pendingAttachments = [];
+  renderAttachmentPreview();
+}
+
+function renderAttachmentPreview() {
+  const container = document.getElementById('attachmentPreview');
+  if (!container) return;
+  let html = pendingAttachments.map((att, i) => {
+    if (att.kind === 'image') {
+      return `<div class="attachment-thumb">
+        <img src="${att.dataUrl}" alt="${att.name}" />
+        <button class="attachment-remove" onclick="removeAttachment(${i})" title="Remove">×</button>
+        <div class="attachment-name">${att.name}</div>
+      </div>`;
+    } else if (att.kind === 'pdf') {
+      return `<div class="attachment-thumb pdf">
+        <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <div class="pdf-label">PDF</div>
+        <button class="attachment-remove" onclick="removeAttachment(${i})" title="Remove">×</button>
+        <div class="attachment-name">${att.name}</div>
+      </div>`;
+    } else if (att.kind === 'html') {
+      return `<div class="attachment-thumb html">
+        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <div class="pdf-label">HTML</div>
+        <button class="attachment-remove" onclick="removeAttachment(${i})" title="Remove">×</button>
+        <div class="attachment-name">${att.name}</div>
+      </div>`;
+    }
+  }).join('');
+  // Only worth its own control once there's more than one — with a
+  // single attachment, its own × button already covers this.
+  if (pendingAttachments.length > 1) {
+    html += `<button class="attachment-clear-all" onclick="clearAllAttachments()" title="Remove all attachments">🗑 Clear all</button>`;
+  }
+  container.innerHTML = html;
+}
+
+// Drag-and-drop support on the chat area
+window.addEventListener('DOMContentLoaded', () => {
+  const dropZone = document.querySelector('.chat-area');
+  if (!dropZone) return;
+  ['dragenter','dragover'].forEach(ev => dropZone.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); }));
+  dropZone.addEventListener('drop', e => {
+    e.preventDefault(); e.stopPropagation();
+    if (e.dataTransfer?.files?.length) handleFileSelect(e.dataTransfer.files);
+  });
+  // Paste images from clipboard
+  document.addEventListener('paste', e => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    const files = [];
+    for (const item of items) {
+      if (item.kind === 'file') {
+        const f = item.getAsFile();
+        if (f) files.push(f);
+      }
+    }
+    if (files.length) { e.preventDefault(); handleFileSelect(files); }
+  });
+});
+
+// ─── KNOWLEDGE BASE ────────────────────────────────────
+const KB = [
+  { id:'stlc-1', source:'STLC · Requirements Phase', tags:['requirements','review','testability','rtm','traceability'], text:'Requirements Review (STLC Phase 1): QA reviews requirements for testability, clarity, completeness and consistency. Key activities: identify ambiguities, create a Requirements Traceability Matrix (RTM) linking each requirement to test cases, define entry/exit criteria.' },
+  { id:'stlc-2', source:'STLC · Test Planning Phase', tags:['planning','test plan','strategy','risk','scope','schedule'], text:'Test Planning (STLC Phase 2): Define scope, approach, resources, schedule and risks. IEEE 829 Test Plan sections: identifier, introduction, test items, features to test, features not to test, approach, item pass/fail criteria, suspension criteria, test deliverables, testing tasks, environmental needs, responsibilities, staffing, risks and contingencies, approvals.' },
+  { id:'stlc-3', source:'STLC · Test Design Phase', tags:['design','test case','test cases','write','create','generate','bdd','gherkin','scenarios','equivalence','boundary'], text:'Test Design (STLC Phase 3): Create detailed test cases and test data. IEEE 829 Test Case Specification: test case ID, test items, input specifications, output specifications, environmental needs. Apply techniques: equivalence partitioning, boundary value analysis, decision tables, state transition testing.' },
+  { id:'stlc-4', source:'STLC · Test Execution Phase', tags:['execution','run','execute','pass','fail','results','summary','report','cycle'], text:'Test Execution (STLC Phase 4): Execute test cases, log results, raise defects for failures. Produce Test Run Summary: total tests, passed, failed, blocked, skipped counts, pass rate %, defects raised per severity. Entry: test environment ready, test data available, test cases reviewed. Exit: all planned tests executed, no open P1/P2 defects, pass rate meets threshold.' },
+  { id:'stlc-5', source:'STLC · Test Closure Phase', tags:['closure','close','lessons','learned','summary','exit','criteria','sign off','sign-off'], text:'Test Closure (STLC Phase 5): Produce Test Summary Report covering objectives met, scope tested, metrics, defect summary, lessons learned, sign-off. Exit criteria checklist: all planned test cases executed, exit criteria met, all critical/high defects closed or deferred with risk acceptance.' },
+  { id:'istqb-ep', source:'ISTQB FL · Equivalence Partitioning', tags:['equivalence','partitioning','ep','partition','class','valid','invalid'], text:'Equivalence Partitioning (ISTQB FL 4.3): Divide input data into valid and invalid partitions where all values in a partition are expected to be processed the same way. Test one value from each partition. Example: age field 18-65 → valid: 18-65, invalid: <18 and >65.' },
+  { id:'istqb-bva', source:'ISTQB FL · Boundary Value Analysis', tags:['boundary','bva','boundary value','edge','min','max'], text:'Boundary Value Analysis (ISTQB FL 4.3): Test at the boundaries of equivalence partitions. For valid range 1-100: test 0 (invalid), 1 (min valid), 2, 99, 100 (max valid), 101 (invalid). Detects off-by-one errors. Two-value BVA: min and max. Three-value BVA: boundary-1, boundary, boundary+1.' },
+  { id:'istqb-dt', source:'ISTQB FL · Decision Table Testing', tags:['decision','table','conditions','actions','rules','combinations'], text:'Decision Table Testing (ISTQB FL 4.4): Used when system behaviour depends on combinations of conditions. Structure: conditions (rows) × rules (columns) = actions. Ensures all condition combinations are tested.' },
+  { id:'istqb-st', source:'ISTQB FL · State Transition Testing', tags:['state','transition','states','events','workflow','flow'], text:'State Transition Testing (ISTQB FL 4.4): Model system as states and transitions triggered by events. Useful for workflow and session-based systems (login, order status, booking). Draw state transition diagram, derive test cases covering all states, all transitions, or all transition pairs.' },
+  { id:'istqb-sev', source:'ISTQB FL · Defect Severity & Priority', tags:['severity','priority','defect','bug','critical','high','medium','low','blocker','p1','p2'], text:'Defect Severity (ISTQB): Impact on system. Critical: crash, data loss, security breach. High: major feature broken, no workaround. Medium: feature partially broken. Low: cosmetic. Priority (urgency): P1 Blocker (immediate), P2 High (current sprint), P3 Medium (next sprint), P4 Low.' },
+  { id:'ieee-bug', source:'IEEE 829 · Bug Report Template', tags:['bug','defect','report','template','ieee','raise','log','create'], text:'IEEE 829 Defect Report fields: Defect ID, Title, Reported By, Date, Severity (Critical/High/Medium/Low), Priority (P1-P4), Status (New/Open/In Progress/Fixed/Verified/Closed), Environment, Module/Component, Steps to Reproduce, Expected Result, Actual Result, Attachments, Root Cause, Fix Version.' },
+  { id:'ieee-tc', source:'IEEE 829 · Test Case Template', tags:['test case','test cases','template','ieee','write','create','generate','format'], text:'IEEE 829 Test Case Specification fields: Test Case ID (TC-XXX-NNN), Title, Module, Priority (High/Medium/Low), Pre-conditions, Test Steps (numbered), Test Data, Expected Result, Actual Result, Pass/Fail status, Notes. Group by feature module. Include positive, negative, boundary, security scenarios.' },
+  { id:'ieee-tp', source:'IEEE 829 · Test Plan Template', tags:['test plan','plan','planning','template','ieee','document'], text:'IEEE 829 Test Plan structure: 1) Test Plan Identifier, 2) Introduction & Objectives, 3) Test Items, 4) Features to be Tested, 5) Features Not to be Tested, 6) Test Approach, 7) Item Pass/Fail Criteria, 8) Suspension & Resumption, 9) Test Deliverables, 10) Testing Tasks & Schedule, 11) Environmental Requirements, 12) Responsibilities, 13) Risks & Contingencies.' },
+  { id:'ieee-rtm', source:'IEEE 829 · Requirements Traceability Matrix', tags:['rtm','traceability','matrix','requirements','coverage','trace','map'], text:'Requirements Traceability Matrix (RTM): document mapping each requirement to its test cases. Columns: Requirement ID, Description, Test Case ID(s), Test Status, Defect ID(s). Ensures 100% requirements coverage. Types: Forward (req → test case), Backward (test case → req), Bidirectional.' },
+  { id:'bdd-1', source:'BDD · Gherkin Scenario Writing', tags:['bdd','gherkin','given','when','then','scenario','feature','cucumber','behave'], text:'BDD Gherkin syntax: Feature, Scenario, Given (preconditions), When (action), Then (outcome), And/But. Example: Scenario: Successful login | Given I am on the login page | When I enter valid credentials | And I click Sign In | Then I should be redirected to the dashboard. Use Scenario Outline with Examples for data-driven tests.' },
+  { id:'agile-1', source:'Agile QA · Shift-Left Testing', tags:['agile','shift left','sprint','early','continuous','ci','regression','automation'], text:'Shift-Left Testing: involve QA early in SDLC — requirement grooming and sprint planning. Per sprint: Day 1-2: review stories for testability, write test cases. Day 3-7: execute tests as features develop. Day 8-10: regression, sprint sign-off.' },
+  { id:'agile-2', source:'Agile QA · Definition of Done', tags:['done','definition','acceptance','criteria','dod','sprint','story'], text:'Definition of Done (DoD): shared checklist a story must meet before Done. Typical: code complete and peer-reviewed, unit tests passing, functional test cases written and executed, no open Critical or High defects, code merged, regression green, product owner acceptance.' },
+  { id:'auto-playwright', source:'Automation · Playwright', tags:['playwright','automation','typescript','test','script','code','locator','fixture','page object','pom'], text:'Playwright (TypeScript/JavaScript): modern cross-browser E2E framework. Recommended locators: page.getByRole(), getByText(), getByLabel(), getByPlaceholder(), getByTestId() — preferred over CSS/XPath for resilience. Auto-waits built in (no manual sleeps). Config: playwright.config.ts defines projects per browser, retries, reporters, baseURL. Fixtures via test.extend(). Folder structure: tests/, pages/ (POM classes), fixtures/, utils/, playwright.config.ts. Run: npx playwright test.' },
+  { id:'auto-cypress', source:'Automation · Cypress', tags:['cypress','automation','javascript','test','script','code','intercept','custom command'], text:'Cypress (JavaScript): browser-based E2E framework with retry-ability built into commands. Commands chain via cy.: cy.visit(), cy.get(), cy.contains(), cy.click(), cy.type(). Use data-cy="..." attributes for stable selectors. Custom commands via Cypress.Commands.add(). Network mocking via cy.intercept(). Folder: cypress/e2e/, cypress/fixtures/, cypress/support/commands.js, cypress.config.js. Run: npx cypress run.' },
+  { id:'auto-selenium', source:'Automation · Selenium WebDriver (Python + pytest)', tags:['selenium','webdriver','python','pytest','automation','test','script','code'], text:'Selenium WebDriver with Python + pytest: cross-browser browser automation. Use webdriver-manager for driver setup. Locators: By.ID, By.NAME, By.CSS_SELECTOR, By.XPATH. Waits: WebDriverWait(driver, 10).until(EC.element_to_be_clickable((By.ID, ...))). pytest fixtures share driver setup via conftest.py with @pytest.fixture(scope="function"). Folder: tests/, pages/, conftest.py, requirements.txt (selenium, pytest, webdriver-manager), pytest.ini.' },
+  { id:'auto-bdd', source:'Automation · BDD/Cucumber + Gherkin', tags:['cucumber','bdd','gherkin','step definitions','feature','scenario','automation','playwright cucumber'], text:'BDD with Cucumber + Gherkin: .feature files describe scenarios in business-readable Given/When/Then. Step definitions implement each step. Playwright + Cucumber.js: @cucumber/cucumber package + custom World class wrapping page. Folder: features/*.feature, features/step_definitions/*.steps.ts, support/world.ts, cucumber.js config. Tag scenarios for selective runs (@smoke, @regression). Use Background block to reduce repetition. Each step keyword (Given/When/Then) maps to a function.' },
+  { id:'auto-pom', source:'Automation · Page Object Model', tags:['pom','page object','design pattern','automation','locators','encapsulation','maintainability'], text:'Page Object Model (POM): design pattern that encapsulates each page UI in a class, exposing methods for user actions and properties for locators. Benefits: maintainability (UI change → one class change), readability (tests describe intent not implementation), reusability. Pattern: class LoginPage { constructor(page) { this.page = page; this.emailInput = page.getByLabel("Email"); ... } async login(email, pwd) { ... } }. Tests stay business-readable; UI details hidden in page classes.' },
+  { id:'auto-folder', source:'Automation · Project Structure & Setup', tags:['folder structure','setup','readme','config','package json','dependencies'], text:'Standard automation project structure: /tests (test specs), /pages (POM classes), /fixtures (test data), /utils (helpers), /reports (output), config file at root (playwright.config.ts / cypress.config.js / pytest.ini), package.json or requirements.txt for dependencies, README.md with install + run commands, .gitignore for node_modules/reports. CI integration via GitHub Actions / GitLab CI / Jenkins. Reports: HTML reporter, JUnit XML for CI.' },
+];
+
+// ─── MODE CONFIG ────────────────────────────────────────
+const modeInfo = {
+  general: { label: 'All Phases', desc: '— Full STLC coverage active', actionsLabel: 'Quick actions', actions: [
+    { text: 'Generate test cases for the target application', type: 'test_cases' },
+    { text: 'Create a test plan for the target application', type: 'test_plan' },
+    { text: 'Identify the top risks for testing the target application', type: 'risk_assessment' },
+    { text: 'Write a bug report for an issue I found on the target page', type: 'bug_report' },
+    { text: 'Generate a Requirements Traceability Matrix for the target app', type: 'traceability_matrix' },
+    { text: 'Create exploratory test charters for the target application', type: null },
+  ]},
+  requirements: { label: 'Requirements Review', desc: '— Testability & RTM mode', actionsLabel: 'Requirements actions', actions: [
+    { text: 'Analyze the target application page and infer the underlying functional requirements', type: null },
+    { text: 'Create a testability checklist applied to the target application', type: null },
+    { text: 'Generate a Requirements Traceability Matrix template for the target app features', type: 'traceability_matrix' },
+    { text: 'Identify any visible UI ambiguities or unclear flows on the target page', type: null },
+    { text: 'List acceptance criteria for the main feature of the target application', type: null },
+  ]},
+  planning: { label: 'Test Planning', desc: '— Test plan & strategy mode', actionsLabel: 'Planning actions', actions: [
+    { text: 'Generate a full IEEE 829 test plan for the target application', type: 'test_plan' },
+    { text: 'Create a risk-based test strategy for the target app', type: 'test_plan' },
+    { text: 'Define test scope: which areas of the target site need most testing coverage', type: 'test_plan' },
+    { text: 'Define entry and exit criteria for a regression cycle on the target app', type: 'exit_criteria' },
+    { text: 'List features-to-test vs features-not-to-test for the target application', type: 'test_plan' },
+  ]},
+  design: { label: 'Test Design', desc: '— Test cases & BDD mode', actionsLabel: 'Design actions', actions: [
+    { text: 'Generate comprehensive test cases for the target application (cover positive, negative, boundary, security)', type: 'test_cases' },
+    { text: 'Write BDD Gherkin scenarios for the main user flow of the target app', type: 'bdd_gherkin' },
+    { text: 'Create test cases for every form field on the target page using EP and BVA', type: 'test_cases' },
+    { text: 'Generate accessibility test cases for the target page (WCAG 2.1 AA)', type: 'test_cases' },
+    { text: 'Write cross-browser compatibility test cases for the target application', type: 'test_cases' },
+    { text: 'Create a decision table for any business rules visible on the target page', type: 'test_cases' },
+  ]},
+  execution: { label: 'Test Execution', desc: '— Run summary & reports mode', actionsLabel: 'Execution actions', actions: [
+    { text: 'Generate a test run summary report for Sprint 24 — 120 tests, 108 passed, 8 failed, 4 blocked', type: 'test_execution_report' },
+    { text: 'Create a daily test execution status email template', type: 'test_execution_report' },
+    { text: 'Write a pass/fail report with defect breakdown by severity', type: 'test_execution_report' },
+    { text: 'List the standard fields to log when executing a manual test case', type: null },
+    { text: 'Generate a regression test execution checklist', type: 'test_execution_report' },
+  ]},
+  defects: { label: 'Defect Management', desc: '— Bug report & triage mode', actionsLabel: 'Defect actions', actions: [
+    { text: 'Create an IEEE 829 bug report for a payment gateway returning HTTP 504', type: 'bug_report' },
+    { text: 'Triage this defect: app crashes on Android 14 when tapping the cart icon', type: 'bug_report' },
+    { text: 'Generate a critical defect template for production issues', type: 'bug_report' },
+    { text: 'Write a defect report for a UI alignment issue on the dashboard', type: 'bug_report' },
+    { text: 'Create a defect lifecycle summary for new QA team members', type: null },
+    { text: 'Suggest severity and priority for a memory leak that slows the app after 30 mins', type: 'bug_report' },
+  ]},
+  closure: { label: 'Test Closure', desc: '— Summary & exit criteria mode', actionsLabel: 'Closure actions', actions: [
+    { text: 'Generate a Test Summary Report for a completed sprint', type: 'test_execution_report' },
+    { text: 'Create an exit criteria checklist for release sign-off', type: 'exit_criteria' },
+    { text: 'Write a lessons learned document covering 5 typical sprint findings', type: 'lessons_learned' },
+    { text: 'Generate test metrics summary: defect density, pass rate, defect leakage', type: 'test_execution_report' },
+    { text: 'Create a release readiness assessment template', type: 'exit_criteria' },
+  ]},
+  automation: { label: 'Test Automation', desc: '— Playwright · Cypress · BDD', actionsLabel: 'Automation actions', actions: [
+    { text: 'Generate a Playwright (TypeScript) Page Object Model and tests for the target application', type: 'automation_code' },
+    { text: 'Generate Cypress (JavaScript) tests with POM for the target application', type: 'automation_code' },
+    { text: 'Generate Selenium WebDriver (Python + pytest) framework for the target application', type: 'automation_code' },
+    { text: 'Create BDD Gherkin feature files with Cucumber + Playwright step definitions', type: 'bdd_gherkin' },
+    { text: 'Generate the full Playwright project structure including playwright.config.ts, fixtures, and README', type: 'automation_code' },
+    { text: 'Convert these manual test cases into Playwright automation scripts', type: 'automation_code' },
+    { text: 'Generate a sample GitHub Actions CI workflow for running the automation tests', type: 'automation_code' },
+    { text: 'I will paste page HTML next — generate Playwright POM with exact selectors from that HTML', type: 'automation_code' },
+  ]},
+  api: { label: 'API Testing', desc: '— REST · GraphQL · JWT/OAuth', actionsLabel: 'API test actions', actions: [
+    { text: 'Generate REST API test cases for the target application endpoints', type: 'api_test_cases' },
+    { text: 'Create a Postman collection with tests for common HTTP methods (GET, POST, PUT, DELETE)', type: 'api_test_cases' },
+    { text: 'Generate GraphQL query and mutation test cases', type: 'api_test_cases' },
+    { text: 'Write API contract tests to validate response schema and status codes', type: 'api_test_cases' },
+    { text: 'Create JWT/OAuth authentication test scenarios', type: 'api_test_cases' },
+    { text: 'Generate negative API test cases — invalid tokens, missing fields, edge cases', type: 'api_test_cases' },
+    { text: 'Write a k6 or Artillery load test script for the main API endpoints', type: 'performance_test_cases' },
+    { text: 'Generate API test automation scripts using Python requests + pytest', type: 'api_test_cases' },
+  ]},
+  security: { label: 'Security Testing', desc: '— OWASP Top 10 · XSS · Injection', actionsLabel: 'Security actions', actions: [
+    { text: 'Generate OWASP Top 10 security test cases for the target application', type: 'security_test_cases' },
+    { text: 'Create XSS (Cross-Site Scripting) injection test cases for all input fields', type: 'security_test_cases' },
+    { text: 'Write SQL injection test scenarios for the target application forms', type: 'security_test_cases' },
+    { text: 'Generate IDOR (Insecure Direct Object Reference) test cases', type: 'security_test_cases' },
+    { text: 'Create authentication and session management security test cases', type: 'security_test_cases' },
+    { text: 'Write CSRF (Cross-Site Request Forgery) test scenarios', type: 'security_test_cases' },
+    { text: 'Generate a security test checklist for a pre-release sign-off', type: 'security_test_cases' },
+    { text: 'Create Burp Suite / OWASP ZAP testing approach for the target application', type: 'security_test_cases' },
+  ]},
+  performance: { label: 'Performance Testing', desc: '— k6 · JMeter · Load & Stress', actionsLabel: 'Performance actions', actions: [
+    { text: 'Generate a k6 load test script for the target application', type: 'performance_test_cases' },
+    { text: 'Create a JMeter test plan for load and stress testing', type: 'performance_test_cases' },
+    { text: 'Write performance test scenarios: load, stress, spike, and soak tests', type: 'performance_test_cases' },
+    { text: 'Generate performance acceptance criteria and SLA thresholds', type: 'performance_test_cases' },
+    { text: 'Create a performance test execution report template', type: 'performance_test_cases' },
+    { text: 'Write a baseline performance benchmark test for the target application', type: 'performance_test_cases' },
+    { text: 'Generate ramp-up and ramp-down load test scenarios', type: 'performance_test_cases' },
+    { text: 'Create a performance testing strategy document', type: 'performance_test_cases' },
+  ]}
+};
+
+// ─── RAG RETRIEVAL ─────────────────────────────────────
+function retrieve(query, mode, topK = 4) {
+  const q = query.toLowerCase();
+  const words = q.split(/\s+/).filter(w => w.length > 2);
+  const modeBoost = {
+    requirements:['requirements','review','testability','rtm','traceability'],
+    planning:['planning','test plan','strategy','risk','scope'],
+    design:['design','test case','test cases','bdd','gherkin','equivalence','boundary'],
+    execution:['execution','run','execute','pass','fail','results'],
+    defects:['defect','bug','severity','priority','report'],
+    closure:['closure','close','lessons','exit','criteria','sign'],
+    automation:['playwright','cypress','selenium','automation','pom','page object','bdd','gherkin','cucumber','script','code'],
+    api:['api','rest','graphql','endpoint','http','request','response','postman','jwt','oauth','contract'],
+    security:['security','owasp','xss','injection','sql','csrf','idor','authentication','session','vulnerability'],
+    performance:['performance','load','stress','spike','soak','k6','jmeter','throughput','latency','concurrent'],
+    general:[]
+  };
+  const scored = KB.map(chunk => {
+    let score = 0;
+    chunk.tags.forEach(tag => {
+      if (q.includes(tag)) score += 3;
+      words.forEach(w => { if (tag.includes(w) || w.includes(tag)) score += 1; });
+    });
+    const tl = chunk.text.toLowerCase();
+    words.forEach(w => { if (tl.includes(w)) score += 0.5; });
+    if (mode !== 'general') {
+      (modeBoost[mode] || []).forEach(t => { if (chunk.tags.includes(t)) score += 2; });
+    }
+    return { chunk, score };
+  });
+  return scored.filter(s => s.score > 0).sort((a,b) => b.score - a.score).slice(0, topK).map(s => s.chunk);
+}
+
+// ─── SYSTEM PROMPT ─────────────────────────────────────
+function buildSystemPrompt(chunks, mode, htmlAttachments = []) {
+  const focus = {
+    general: 'You cover the full Software Testing Life Cycle (STLC).',
+    requirements: 'You are focused on Requirements Review: testability analysis and RTM creation.',
+    planning: 'You are focused on Test Planning: test plans, strategies, scope, risk assessment.',
+    design: 'You are focused on Test Design: test cases, BDD scenarios, design techniques.',
+    execution: 'You are focused on Test Execution: running tests, logging results, run summaries.',
+    defects: 'You are focused on Defect Management: IEEE 829 bug reports, severity/priority triage.',
+    closure: 'You are focused on Test Closure: summary reports, exit criteria, lessons learned.',
+    automation: 'You are focused on Test Automation: generating production-ready Page Object Model code, test scripts, and project structures in Playwright (TypeScript preferred), Cypress (JavaScript), Selenium WebDriver (Python + pytest), and BDD/Cucumber+Gherkin. Always produce complete, runnable code with proper imports, modern locator strategies (getByRole, getByLabel, data-testid), POM separation, and a brief setup README. Use fenced code blocks with the correct language tag (```typescript, ```javascript, ```python, ```gherkin, ```yaml). IMPORTANT: when generating selectors, be honest about your source. If you only have a SCREENSHOT (no HTML), use role/label/text-based locators inferred from visible UI elements, and explicitly note at the top: "// NOTE: selectors inferred from visual UI. Verify against actual DOM (right-click → Inspect) before running." If you have ACTUAL HTML (from CORS fetch or user-pasted), use exact attribute selectors (id, name, data-testid) from the HTML and note: "// Selectors extracted from page HTML — should run as-is." If you have NEITHER, use generic placeholders like <TODO: locate via inspector> and flag this clearly. Never fabricate specific selectors that have no basis in either screenshot or HTML.',
+    api: 'You are focused on API Testing: REST, GraphQL, Postman collections, JWT/OAuth, contract testing, and API automation. Generate complete test suites with positive, negative, boundary, and security test cases for APIs. Include status code validation, response schema checks, header validation, and authentication testing. For automation, generate Python requests+pytest or JavaScript/Axios scripts. Reference ISTQB API testing principles and IEEE 829 test documentation standards.',
+    security: 'You are focused on Security Testing: OWASP Top 10, XSS, SQL injection, CSRF, IDOR, authentication flaws, session management, and security misconfigurations. Generate detailed security test cases with attack vectors, payloads, and expected behaviors. Reference OWASP Testing Guide methodology. Include both manual testing steps and automated scanning approaches using tools like Burp Suite and OWASP ZAP.',
+    performance: 'You are focused on Performance Testing: load testing, stress testing, spike testing, soak testing, and scalability testing. Generate k6 scripts, JMeter test plans, and performance test strategies. Define SLA thresholds, acceptance criteria, and ramp-up/ramp-down profiles. Include monitoring guidance and performance test reporting templates. Reference ISTQB performance testing principles.'
+  };
+  const context = chunks.map(c => `[${c.source}]\n${c.text}`).join('\n\n---\n\n');
+  let targetContext = '';
+  if (targetApp.url) {
+    targetContext = `\n\nTARGET APPLICATION UNDER TEST:\nURL: ${targetApp.url}`;
+    if (targetApp.description) targetContext += `\nDescription: ${targetApp.description}`;
+    if (targetApp.pageContent) targetContext += `\n\nFETCHED PAGE CONTENT:\n${targetApp.pageContent}`;
+    else targetContext += `\n\nNote: Page HTML could not be fetched (CORS). Use URL and description to infer realistic page elements.`;
+    targetContext += `\n\nWhen generating deliverables, GROUND THEM IN THIS TARGET APPLICATION. Reference the actual URL, real form fields, real button labels.`;
+  }
+
+  // Inject HTML files attached to this message
+  let htmlContext = '';
+  if (htmlAttachments.length > 0) {
+    htmlContext = '\n\nUSER-ATTACHED HTML FILES (extracted DOM structure):';
+    htmlAttachments.forEach(att => {
+      htmlContext += `\n\n=== ${att.name} (${att.rawSize.toLocaleString()} chars raw) ===\n${att.textContent}`;
+    });
+    htmlContext += `\n\nIMPORTANT: The HTML above is from REAL files the user attached. When generating automation code (Playwright/Cypress/Selenium), use the EXACT selectors visible in this HTML (id, name, data-testid, class attributes, button text). Note in comments that "Selectors extracted from user-attached HTML file — should run as-is".`;
+  }
+  return `You are AmbitQA, a senior QA lead assistant grounded in ISTQB FL, IEEE 829, and STLC methodology. ${focus[mode] || focus.general}
+
+RETRIEVED KNOWLEDGE BASE CONTEXT:
+${context}${targetContext}${htmlContext}
+
+INSTRUCTIONS:
+- Ground every answer in the retrieved context. Cite source labels naturally.
+- If screenshots or PDFs are attached, examine them carefully and reference SPECIFIC visible UI elements (button labels, field names, navigation items, content) when generating deliverables.
+- For test cases: ALWAYS render a comprehensive markdown table with these EXACT columns in this order: TC ID | Title | Priority | Pre-conditions | Steps | Expected Result. Every row must have all six columns filled in — the Steps column should contain numbered steps as "1. ... 2. ... 3. ..." within the cell. Do NOT produce a summary-only table without these detail columns; the full table is the primary deliverable. When also generating automation code, place this comprehensive table BEFORE the code blocks.
+- For bug reports: markdown table with Field | Value rows for all IEEE 829 fields.
+- For test plans: produce ALL 13 IEEE 829 sections in full — Test Plan Identifier, Introduction & Objectives, Test Items, Features to be Tested, Features Not to be Tested, Test Approach, Item Pass/Fail Criteria, Suspension & Resumption, Test Deliverables, Testing Tasks & Schedule, Environmental Requirements, Responsibilities, Risks & Contingencies. Do NOT abbreviate or skip sections. Use numbered section headers (## Section 1 — ...) and markdown tables where appropriate.
+- For RTMs and closure reports: numbered sections and markdown tables.
+- Severity: Critical, High, Medium, Low. Priority: P1 Blocker, P2 High, P3 Medium, P4 Low.
+- Steps in cells: "1. ... 2. ... 3. ..."
+- Never output the literal word "undefined" or "null". Use <Name>, <Date>, <TBD>, or "_____".
+- Be concise but complete. Ask for missing details only if truly necessary.
+- Never abbreviate, skip, or summarize sections with placeholders like "...continued" or "additional test cases follow the same pattern". Either generate the full content, or tell the user up-front that you'll cover a subset and let them ask for more.
+- End with: "Sources used: " followed by the chunk source labels you referenced.`;
+}
+
+// ─── API CALL ──────────────────────────────────────────
+function getCurrentModel() {
+  if (activeProvider === 'custom') {
+    return document.getElementById('customModelInput')?.value?.trim() || 'custom-model';
+  }
+  const sel = document.getElementById('modelSelect');
+  return (sel && sel.value) || PROVIDER_MODELS[activeProvider]?.[0] || 'claude-sonnet-4-6';
+}
+
+function getCustomEndpointUrl() {
+  return document.getElementById('customEndpointInput')?.value?.trim()
+    || localStorage.getItem('ambitqa-custom-endpoint')
+    || '';
+}
+
+// Converts the canonical (Anthropic-shaped) conversationHistory into the
+// OpenAI-compatible "messages" array used by OpenAI, xAI, OpenRouter, and
+// any custom OpenAI-compatible endpoint.
+function toOpenAIMessages(systemPrompt, history) {
+  const messages = [{ role: 'system', content: systemPrompt }];
+  for (const turn of history) {
+    if (typeof turn.content === 'string') {
+      messages.push({ role: turn.role, content: turn.content });
+      continue;
+    }
+    // Array of Anthropic-style blocks — convert each to OpenAI's equivalent.
+    // Note: standard OpenAI-compatible chat completions has no raw-PDF block;
+    // rather than silently dropping it, swap in a visible text note so the
+    // model (and anyone reading the transcript) knows content was omitted.
+    const parts = [];
+    for (const block of turn.content) {
+      if (block.type === 'text') parts.push({ type: 'text', text: block.text });
+      else if (block.type === 'image') {
+        parts.push({ type: 'image_url', image_url: { url: `data:${block.source.media_type};base64,${block.source.data}` } });
+      } else if (block.type === 'document') {
+        parts.push({ type: 'text', text: "[PDF attachment omitted — not supported by this provider's API. Try Anthropic or Google, or describe the relevant content in text.]" });
+      }
+    }
+    messages.push({ role: turn.role, content: parts });
+  }
+  return messages;
+}
+
+// Converts the canonical conversationHistory into Gemini's "contents" array.
+// Gemini uses role "model" instead of "assistant", and inline_data (base64)
+// for both images and PDFs — Gemini natively supports inline PDF data, so
+// unlike the OpenAI-compatible path, PDFs pass through fully here.
+function toGeminiContents(history) {
+  return history.map(turn => {
+    const role = turn.role === 'assistant' ? 'model' : 'user';
+    if (typeof turn.content === 'string') {
+      return { role, parts: [{ text: turn.content }] };
+    }
+    const parts = turn.content.map(block => {
+      if (block.type === 'text') return { text: block.text };
+      if (block.type === 'image') return { inline_data: { mime_type: block.source.media_type, data: block.source.data } };
+      if (block.type === 'document') return { inline_data: { mime_type: 'application/pdf', data: block.source.data } };
+      return { text: '' };
+    });
+    return { role, parts };
+  });
+}
+
+async function callLLM(userMessage, attachments = []) {
+  const queryForRetrieval = userMessage || 'analyze the attached content';
+  const chunks = retrieve(queryForRetrieval, currentMode);
+
+  // Separate HTML files (go into prompt as text) from images/PDFs (go into message content)
+  const htmlAttachments = attachments.filter(a => a.kind === 'html');
+  const mediaAttachments = attachments.filter(a => a.kind === 'image' || a.kind === 'pdf');
+
+  const systemPrompt = buildSystemPrompt(chunks, currentMode, htmlAttachments);
+
+  // Build user message content (canonical Anthropic-block shape — converted
+  // per-provider at request-build time below, via toOpenAIMessages/toGeminiContents)
+  let content;
+  if (mediaAttachments.length > 0) {
+    content = [];
+    for (const att of mediaAttachments) {
+      if (att.kind === 'image') {
+        content.push({
+          type: 'image',
+          source: { type: 'base64', media_type: att.type, data: att.base64 }
+        });
+      } else if (att.kind === 'pdf') {
+        content.push({
+          type: 'document',
+          source: { type: 'base64', media_type: 'application/pdf', data: att.base64 }
+        });
+      }
+    }
+    let textPart = userMessage || 'Please analyze the attached content and generate appropriate QA deliverables.';
+    if (htmlAttachments.length > 0) {
+      textPart += `\n\n(${htmlAttachments.length} HTML file(s) also attached — see system context for extracted structure.)`;
+    }
+    content.push({ type: 'text', text: textPart });
+  } else if (htmlAttachments.length > 0) {
+    content = (userMessage || 'Please analyze the attached HTML file(s) and generate appropriate QA deliverables. Use the actual DOM elements visible in the HTML for selectors when generating automation code.');
+  } else {
+    content = userMessage;
+  }
+
+  conversationHistory.push({ role: 'user', content });
+  currentAbortController = new AbortController();
+
+  const provider = activeProvider;
+  const model = getCurrentModel();
+  let text, wasTruncated;
+
+  if (provider === 'anthropic') {
+    const response = await fetch(PROVIDER_ENDPOINTS.anthropic, {
+      method: 'POST',
+      signal: currentAbortController.signal,
+      headers: { 'Content-Type':'application/json', 'x-api-key':apiKey, 'anthropic-version':'2023-06-01', 'anthropic-dangerous-direct-browser-access':'true' },
+      body: JSON.stringify({ model, max_tokens:48000, system:systemPrompt, messages:conversationHistory })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+    const data = await response.json();
+    text = data.content?.[0]?.text || '';
+    wasTruncated = data.stop_reason === 'max_tokens';
+
+  } else if (provider === 'google') {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      signal: currentAbortController.signal,
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: toGeminiContents(conversationHistory),
+        generationConfig: { maxOutputTokens: 8192 }
+      })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+    const data = await response.json();
+    text = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    wasTruncated = data.candidates?.[0]?.finishReason === 'MAX_TOKENS';
+
+  } else {
+    // OpenAI-compatible: openai, xai, openrouter, custom
+    const endpoint = provider === 'custom' ? getCustomEndpointUrl() : PROVIDER_ENDPOINTS[provider];
+    if (!endpoint) throw new Error('No endpoint configured for this provider. Please enter a Custom Endpoint URL.');
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      signal: currentAbortController.signal,
+      headers: { 'Content-Type':'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, max_tokens: 8192, messages: toOpenAIMessages(systemPrompt, conversationHistory) })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error?.message || `API error ${response.status}`);
+    }
+    const data = await response.json();
+    text = data.choices?.[0]?.message?.content || '';
+    wasTruncated = data.choices?.[0]?.finish_reason === 'length';
+  }
+
+  conversationHistory.push({ role: 'assistant', content: text });
+  return { text, chunks, wasTruncated };
+}
+
+// ─── MARKDOWN RENDERER ─────────────────────────────────
+function renderMarkdown(text) {
+  // STRICT source line: must start a line, must say "Sources used:" (or "Source used:"), then sources
+  const srcMatch = text.match(/^\s*\*?\*?Sources?\s+used\s*:\*?\*?\s*([^\n]+)$/im);
+  let sourcesHtml = '', mainText = text;
+  // Validate the capture: should be short and contain source-label patterns (· bullet, or short comma list)
+  // Reject if it looks like prose: contains table pipe `|`, ends mid-sentence, or is >300 chars
+  if (srcMatch && srcMatch[1].length < 300 && !srcMatch[1].includes('|') && !/\b(the|a|an|is|are|was|were|locate|click|navigate|select)\b/i.test(srcMatch[1])) {
+    mainText = text.slice(0, srcMatch.index).trim();
+    const seen = new Set();
+    const srcs = srcMatch[1].trim()
+      .split(/[·•\-,\n]+/)
+      .map(s => s.replace(/[`*_~]/g, '').replace(/\s+/g, ' ').trim())  // strip backticks, asterisks, underscores, tildes
+      .filter(s => s.length > 2 && s.length < 80)
+      .filter(s => {  // dedupe case-insensitively
+        const key = s.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    sourcesHtml = srcs.map(s => `<span class="source-chip">${s}</span>`).join('');
+  }
+  const originalMarkdown = mainText;
+  const codeBlocks = [];
+  mainText = mainText.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length;
+    const escaped = code.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    codeBlocks.push(`<pre class="code-block"${lang ? ` data-lang="${lang}"` : ''}><code>${escaped}</code></pre>`);
+    return `\x00CODEBLOCK${idx}\x00`;
+  });
+  let html = mainText
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
+    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
+    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
+    .replace(/^---+$/gm, '<hr>')
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/(\|.+\|\n)+/g, m => {
+      const rows = m.trim().split('\n');
+      let t = '<table>';
+      rows.forEach((row, i) => {
+        if (row.match(/^\|[-\s|:]+\|$/)) return;
+        // Replace escaped pipes \| with a placeholder, split on real pipes, then restore
+        const cells = row.replace(/\\\|/g, '\x01').split('|').filter((_,j,a) => j>0 && j<a.length-1).map(c => c.replace(/\x01/g, '|'));
+        const tag = i === 0 ? 'th' : 'td';
+        t += '<tr>' + cells.map(c => `<${tag}>${c.trim()}</${tag}>`).join('') + '</tr>';
+      });
+      return t + '</table>';
+    })
+    .replace(/^(\d+\.\s.+)(\n\d+\.\s.+)*/gm, m => {
+      const items = m.split('\n').filter(Boolean);
+      return '<ol>' + items.map(li => `<li>${li.replace(/^\d+\.\s/,'')}</li>`).join('') + '</ol>';
+    })
+    .replace(/^[-*]\s(.+)/gm, '<li>$1</li>')
+    .replace(/(<li>.*<\/li>\n?)+/g, m => `<ul>${m}</ul>`)
+    .replace(/(^&gt;\s?.+(\n&gt;\s?.+)*)/gm, m => {
+      const inner = m.split('\n').map(l => l.replace(/^&gt;\s?/, '')).join('<br>');
+      return `<blockquote>${inner}</blockquote>`;
+    })
+    .replace(/\n{2,}/g,'</p><p>')
+    .replace(/\n/g,'<br>');
+  html = html.replace(/\x00CODEBLOCK(\d+)\x00/g, (_, idx) => codeBlocks[parseInt(idx)]);
+  html = `<p>${html}</p>`
+    .replace(/<p>(<(?:h[1-3]|table|hr|ul|ol|pre|blockquote)[\s\S]*?<\/(?:h[1-3]|table|ul|ol|pre|blockquote)>|<hr>)<\/p>/g, '$1')
+    .replace(/<p>\s*<\/p>/g, '')
+    .replace(/<br>\s*(<(?:h[1-3]|table|hr|ul|ol|pre|blockquote))/g, '$1');
+  return { html, sourcesHtml, rawMarkdown: originalMarkdown };
+}
+
+// ─── MARKDOWN → PLAIN TEXT (for clean TXT export) ──────
+function convertTableToText(tableMd) {
+  const lines = tableMd.trim().split('\n').map(l => l.trim());
+  const rows = lines
+    .filter(l => l.startsWith('|') && l.endsWith('|') && !/^\|[-\s|:]+\|$/.test(l))
+    .map(l => l.split('|').slice(1, -1).map(c =>
+      c.trim()
+        .replace(/\*\*([^*]+)\*\*/g, '$1')
+        .replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '$1')
+        .replace(/`([^`]+)`/g, '$1')
+        .replace(/\\([<>])/g, '$1')
+    ));
+  if (rows.length < 2) return tableMd;
+  const header = rows[0];
+  const dataRows = rows.slice(1);
+  // 2-column tables: simple key: value list
+  if (header.length === 2) {
+    return '\n' + dataRows.map(r => `  ${r[0]}: ${r[1] || ''}`).join('\n') + '\n';
+  }
+  // 3+ column tables: record format
+  return '\n' + dataRows.map(row => {
+    const title = `${header[0]}: ${row[0] || ''}`;
+    const rest = row.slice(1).map((cell, j) =>
+      `  ${header[j+1] || ''}: ${cell || ''}`
+    ).join('\n');
+    return `${title}\n${rest}`;
+  }).join('\n\n') + '\n';
+}
+
+function markdownToPlainText(md) {
+  let txt = md;
+  // 1. Code fences → preserve content, drop backticks
+  txt = txt.replace(/```(?:\w*)\n?([\s\S]*?)```/g, (_, code) => '\n' + code.trim() + '\n');
+  // 2. Tables → record-style text
+  txt = txt.replace(/((?:^\|.+\|\n?)+)/gm, m => convertTableToText(m));
+  // 3. Headings
+  txt = txt.replace(/^### (.+)$/gm, (_, t) => {
+    const clean = t.replace(/\*\*/g, '').replace(/(?<!\*)\*(?!\*)/g, '');
+    return `\n${clean}\n`;
+  });
+  txt = txt.replace(/^## (.+)$/gm, (_, t) => {
+    const clean = t.replace(/\*\*/g, '').replace(/(?<!\*)\*(?!\*)/g, '');
+    return `\n${clean}\n${'─'.repeat(Math.min(clean.length, 60))}`;
+  });
+  txt = txt.replace(/^# (.+)$/gm, (_, t) => {
+    const clean = t.replace(/\*\*/g, '').replace(/(?<!\*)\*(?!\*)/g, '');
+    return `\n${clean.toUpperCase()}\n${'═'.repeat(Math.min(clean.length, 60))}`;
+  });
+  // 4. Horizontal rules
+  txt = txt.replace(/^---+$/gm, '─'.repeat(60));
+  // 5. Bold + italic
+  txt = txt.replace(/\*\*([^*]+)\*\*/g, '$1');
+  txt = txt.replace(/(?<!\*)\*([^*\n]+)\*(?!\*)/g, '$1');
+  // 6. Inline code
+  txt = txt.replace(/`([^`]+)`/g, '$1');
+  // 7. Blockquotes → indented quote line
+  txt = txt.replace(/^> ?(.*)$/gm, '  │ $1');
+  // 8. Escaped angle brackets
+  txt = txt.replace(/\\([<>])/g, '$1');
+  // 9. Cleanup excessive blank lines
+  txt = txt.replace(/\n{3,}/g, '\n\n');
+  return txt.trim();
+}
+
+// ─── EXPORT FUNCTIONS ──────────────────────────────────
+function detectContentType(md) {
+  const tables = parseMarkdownTables(md);
+  if (tables.length === 0) return 'document';
+
+  for (const table of tables) {
+    if (table.rows.length < 2) continue;
+    const header = table.rows[0].map(h => h.toLowerCase().replace(/\*/g, '').trim());
+
+    // Test case table: must have TC-ID-like column + Priority + (Title OR Steps)
+    const hasTcIdCol = header.some(h => /^(tc[\s-]?id|test\s*case\s*id|tc#?)$/.test(h));
+    const hasPriorityCol = header.includes('priority');
+    const hasTitleOrSteps = header.some(h => /^(title|scenario|description|steps?|expected.*)$/.test(h));
+    if (hasTcIdCol && hasPriorityCol && hasTitleOrSteps) return 'testcases';
+
+    // Bug report: 2-column Field/Value table with IEEE 829 markers
+    if (table.rows[0].length === 2 && table.rows.length >= 5) {
+      const fieldNames = table.rows.slice(1).map(r => (r[0] || '').toLowerCase().replace(/\*/g, '').trim());
+      const hasIdField = fieldNames.some(f => /^(defect|bug)\s*id$/.test(f));
+      const hasSeverityField = fieldNames.includes('severity');
+      const hasStepsField = fieldNames.some(f => /steps to reproduce/.test(f));
+      if (hasIdField && hasSeverityField && hasStepsField) return 'bugreport';
+    }
+  }
+  return 'document';
+}
+
+function parseMarkdownTables(md) {
+  const tables = [];
+  const lines = md.split('\n');
+  let current = null;
+  for (const line of lines) {
+    const t = line.trim();
+    if (t.startsWith('|') && t.endsWith('|')) {
+      // Replace escaped pipes \| with placeholder, split, restore
+      const cells = t.replace(/\\\|/g, '\x01').split('|').slice(1, -1).map(c => c.trim().replace(/\x01/g, '|'));
+      if (!current) current = { rows: [] };
+      if (!cells.every(c => /^[-:\s]*$/.test(c))) current.rows.push(cells);
+    } else if (current && current.rows.length > 0) {
+      tables.push(current); current = null;
+    }
+  }
+  if (current && current.rows.length > 0) tables.push(current);
+  return tables;
+}
+
+function toCSV(rows) {
+  return rows.map(row => row.map(cell => {
+    const c = String(cell).replace(/"/g, '""');
+    return /[",\n]/.test(c) ? `"${c}"` : c;
+  }).join(',')).join('\n');
+}
+
+function downloadFile(content, filename, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 100);
+}
+
+function buildFilename(rawMd, contentType, ext) {
+  const ts = new Date().toISOString().slice(0,10);
+  let topic = '';
+  const h = rawMd.match(/^#{1,2}\s+(.+)$/m);
+  if (h && h[1]) topic = h[1];
+  if (!topic) {
+    const b = rawMd.match(/\*\*([^*\n]{4,80})\*\*/);
+    if (b && b[1]) topic = b[1];
+  }
+  if (!topic) {
+    const first = rawMd.split('\n').find(l => l.trim().length > 6 && l.trim().length < 100);
+    if (first) topic = first;
+  }
+  topic = topic
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/[^\w\s\-]/g, '').trim().toLowerCase()
+    .replace(/\s+/g, '-').replace(/-+/g, '-')
+    .slice(0, 60).replace(/^-+|-+$/g, '');
+  const typeLabel = { testcases:'test-cases', bugreport:'bug-report', document:'' }[contentType] || '';
+  const parts = [];
+  if (typeLabel && !topic.includes(typeLabel.replace('-',''))) parts.push(typeLabel);
+  if (topic) parts.push(topic);
+  if (parts.length === 0) parts.push('ambitqa-export');
+  parts.push(ts);
+  return parts.join('-') + '.' + ext;
+}
+
+function buildRichHtmlForClipboard(rawMd) {
+  const { html } = renderMarkdown(rawMd);
+  // Inline-styled HTML that pastes nicely into TextEdit, Word, Pages, Notion, Google Docs, etc.
+  return `<meta charset="utf-8"><div style="font-family:-apple-system,Helvetica,Arial,sans-serif;line-height:1.6;color:#0F0E1F;font-size:14px;background:#FFFFFF;">
+<style>
+.qa-doc h1{font-family:Helvetica,Arial,sans-serif;font-size:22px;color:#312E81;margin:18px 0 10px;border-bottom:2px solid #312E81;padding-bottom:6px;font-weight:700;}
+.qa-doc h2{font-family:Helvetica,Arial,sans-serif;font-size:18px;color:#312E81;margin:20px 0 8px;border-bottom:1px solid #C7D2FE;padding-bottom:4px;font-weight:700;}
+.qa-doc h3{font-family:Helvetica,Arial,sans-serif;font-size:15px;color:#312E81;margin:14px 0 6px;font-weight:700;}
+.qa-doc p{margin:8px 0;color:#0F0E1F;}
+.qa-doc strong{font-weight:700;color:#0F0E1F;}
+.qa-doc hr{border:0;border-top:1px solid #C7D2FE;margin:14px 0;}
+.qa-doc blockquote{margin:10px 0;padding:4px 14px;border-left:3px solid #312E81;color:#4A4566;font-style:italic;}
+.qa-doc blockquote p{margin:0;color:#4A4566;}
+.qa-doc table{width:100%;border-collapse:collapse;margin:10px 0;background:#FFFFFF;}
+.qa-doc th{font-weight:700;color:#312E81;padding:8px 12px;border:1px solid #C7D2FE;border-bottom:2px solid #312E81;text-align:left;font-size:13px;background:#FFFFFF;}
+.qa-doc td{padding:6px 12px;border:1px solid #C7D2FE;vertical-align:top;font-size:13px;color:#0F0E1F;background:#FFFFFF;}
+.qa-doc code{font-family:Menlo,'Courier New',monospace;font-size:0.9em;color:#312E81;}
+.qa-doc pre.code-block{background:#FFFFFF;border:1px solid #C7D2FE;border-left:3px solid #312E81;border-radius:3px;padding:10px 14px;margin:10px 0;font-family:Menlo,'Courier New',monospace;font-size:12px;line-height:1.5;color:#0F0E1F;white-space:pre-wrap;}
+.qa-doc pre.code-block code{color:#0F0E1F;}
+.qa-doc ul,.qa-doc ol{padding-left:22px;margin:6px 0;color:#0F0E1F;}
+.qa-doc li{margin-bottom:3px;color:#0F0E1F;}
+</style>
+<div class="qa-doc">${html}</div>
+</div>`;
+}
+
+async function copyToClipboard(rawMd) {
+  const cleanText = markdownToPlainText(rawMd);
+  try {
+    await navigator.clipboard.writeText(cleanText);
+    showToast('Copied as plain text — for formatted output use RTF or HTML download');
+  } catch (e) {
+    showToast('Copy failed — try a download option instead');
+  }
+}
+
+// ─── RTF GENERATION ────────────────────────────────────
+function rtfEscape(s) {
+  if (!s) return '';
+  let out = '';
+  for (const c of s) {
+    const code = c.charCodeAt(0);
+    if (c === '\\') out += '\\\\';
+    else if (c === '{') out += '\\{';
+    else if (c === '}') out += '\\}';
+    else if (code < 128) out += c;
+    else out += `\\u${code}?`;
+  }
+  return out;
+}
+
+function inlineRtf(text) {
+  let result = '';
+  let i = 0;
+  while (i < text.length) {
+    // Bold **text**
+    if (text.substr(i, 2) === '**') {
+      const end = text.indexOf('**', i + 2);
+      if (end !== -1) {
+        result += `{\\b ${inlineRtf(text.substring(i + 2, end))}}`;
+        i = end + 2; continue;
+      }
+    }
+    // Italic *text* (single star not part of bold)
+    if (text[i] === '*' && text[i+1] !== '*' && (i === 0 || text[i-1] !== '*')) {
+      const end = text.indexOf('*', i + 1);
+      if (end !== -1 && text[end + 1] !== '*') {
+        result += `{\\i ${inlineRtf(text.substring(i + 1, end))}}`;
+        i = end + 1; continue;
+      }
+    }
+    // Inline code `code`
+    if (text[i] === '`') {
+      const end = text.indexOf('`', i + 1);
+      if (end !== -1) {
+        result += `{\\f1\\cf2 ${rtfEscape(text.substring(i + 1, end))}}`;
+        i = end + 1; continue;
+      }
+    }
+    // Escaped < and >
+    if (text[i] === '\\' && (text[i+1] === '<' || text[i+1] === '>')) {
+      result += rtfEscape(text[i + 1]);
+      i += 2; continue;
+    }
+    result += rtfEscape(text[i]);
+    i++;
+  }
+  return result;
+}
+
+function renderTableRtf(tableLines) {
+  const rows = tableLines
+    .filter(l => !/^\|[-\s|:]+\|$/.test(l))
+    .map(l => l.split('|').slice(1, -1).map(c => c.trim()));
+  if (rows.length === 0) return '';
+  const numCols = Math.max(...rows.map(r => r.length));
+  const tableWidth = 9500;
+  const cellWidth = Math.floor(tableWidth / numCols);
+  let rtf = '\\pard\\par\n';
+  rows.forEach((row, ri) => {
+    const isHeader = ri === 0;
+    rtf += '\\trowd\\trgaph80\\trleft0\\trkeep\n';
+    for (let c = 0; c < numCols; c++) {
+      rtf += '\\clbrdrt\\brdrs\\brdrw10\\brdrcf6';
+      rtf += '\\clbrdrl\\brdrs\\brdrw10\\brdrcf6';
+      // Header row: thicker bottom border for emphasis
+      if (isHeader) rtf += '\\clbrdrb\\brdrs\\brdrw20\\brdrcf1';
+      else rtf += '\\clbrdrb\\brdrs\\brdrw10\\brdrcf6';
+      rtf += '\\clbrdrr\\brdrs\\brdrw10\\brdrcf6';
+      rtf += `\\cellx${(c + 1) * cellWidth}\n`;
+    }
+    for (let c = 0; c < numCols; c++) {
+      const cell = row[c] || '';
+      rtf += '\\pard\\intbl ';
+      if (isHeader) rtf += `\\b\\cf1 ${inlineRtf(cell)}\\b0\\cf3`;
+      else rtf += `\\cf3 ${inlineRtf(cell)}`;
+      rtf += '\\cell\n';
+    }
+    rtf += '\\row\n';
+  });
+  rtf += '\\pard\\par\n';
+  return rtf;
+}
+
+function generateRtf(md) {
+  // Strip sources line
+  const srcMatch = md.match(/\*?\*?Sources?(?:\s*used)?:?\*?\*?\s*([\s\S]+?)$/im);
+  let main = md, sources = '';
+  if (srcMatch) {
+    main = md.slice(0, srcMatch.index).trim();
+    sources = srcMatch[1].trim();
+  }
+
+  // RTF header — fonts, colors (1=dark indigo headings, 2=brand indigo, 3=near-black text, 4=dark muted, 5=light bg, 6=border, 7=white)
+  let rtf = '{\\rtf1\\ansi\\ansicpg1252\\deff0\\nouicompat\\deflang1033\n';
+  rtf += '{\\fonttbl{\\f0\\fnil\\fcharset0 Helvetica;}{\\f1\\fnil\\fcharset0 Menlo;}}\n';
+  rtf += '{\\colortbl ;\\red49\\green46\\blue129;\\red67\\green56\\blue202;\\red15\\green14\\blue31;\\red74\\green69\\blue102;\\red244\\green244\\blue251;\\red199\\green210\\blue254;\\red255\\green255\\blue255;}\n';
+  // Explicit white page background — overrides macOS Dark Mode tinting
+  rtf += '{\\*\\background{\\shp{\\*\\shpinst\\shpleft0\\shptop0\\shpright0\\shpbottom0\\shpbxpage\\shpbypage\\shpwr0\\shpwrk0\\shpfblwtxt1\\shpz0\\shplockanchor{\\sp{\\sn shapeType}{\\sv 1}}{\\sp{\\sn fillColor}{\\sv 16777215}}{\\sp{\\sn fFilled}{\\sv 1}}{\\sp{\\sn fLine}{\\sv 0}}}}}\n';
+  rtf += '\\f0\\fs22\\cf3\n';
+
+  // Document header
+  rtf += '\\pard\\b\\fs36\\cf2 AmbitQA \\u8212? Export\\b0\\fs22\\cf3\\par\n';
+  rtf += `\\fs20\\cf4 Generated ${new Date().toLocaleDateString()} \\u183? ISTQB \\u183? IEEE 829 grounded\\par\n`;
+  rtf += '\\pard\\par\n';
+
+  const lines = main.split('\n');
+  let i = 0, inCode = false, codeLines = [];
+
+  while (i < lines.length) {
+    const line = lines[i];
+
+    if (line.trim().match(/^```/)) {
+      if (inCode) {
+        rtf += '\\pard\\li360\\sa80 ';
+        codeLines.forEach(cl => { rtf += `{\\f1\\fs18\\cf2 ${rtfEscape(cl)}}\\line\n`; });
+        rtf += '\\par\\pard\n';
+        codeLines = []; inCode = false;
+      } else inCode = true;
+      i++; continue;
+    }
+    if (inCode) { codeLines.push(line); i++; continue; }
+
+    // Table block
+    if (line.trim().match(/^\|.+\|$/)) {
+      const tLines = [];
+      while (i < lines.length && lines[i].trim().match(/^\|.+\|$/)) {
+        tLines.push(lines[i].trim()); i++;
+      }
+      rtf += renderTableRtf(tLines);
+      continue;
+    }
+
+    let m;
+    if ((m = line.match(/^# (.+)$/))) {
+      rtf += `\\pard\\sb360\\sa120\\b\\fs32\\cf2 ${inlineRtf(m[1])}\\b0\\fs22\\cf3\\par\n`;
+    } else if ((m = line.match(/^## (.+)$/))) {
+      rtf += `\\pard\\sb280\\sa100\\b\\fs28\\cf1 ${inlineRtf(m[1])}\\b0\\fs22\\cf3\\par\n`;
+    } else if ((m = line.match(/^### (.+)$/))) {
+      rtf += `\\pard\\sb200\\sa80\\b\\fs24\\cf1 ${inlineRtf(m[1])}\\b0\\fs22\\cf3\\par\n`;
+    } else if (line.trim() === '---') {
+      rtf += '\\pard\\par\n';
+    } else if (line.trim().match(/^>\s?/)) {
+      const text = line.replace(/^>\s?/, '');
+      rtf += `\\pard\\li360\\sa80 {\\cf4 ${inlineRtf(text)}}\\par\\pard\n`;
+    } else if ((m = line.match(/^[-*]\s+(.+)$/))) {
+      rtf += `\\pard\\fi-200\\li600 \\u8226?  ${inlineRtf(m[1])}\\par\\pard\n`;
+    } else if ((m = line.match(/^(\d+)\.\s+(.+)$/))) {
+      rtf += `\\pard\\fi-200\\li600 ${m[1]}.  ${inlineRtf(m[2])}\\par\\pard\n`;
+    } else if (line.trim() === '') {
+      rtf += '\\par\n';
+    } else {
+      rtf += `${inlineRtf(line)}\\par\n`;
+    }
+    i++;
+  }
+
+  if (sources) {
+    rtf += '\\pard\\sb360\\b\\fs20\\cf4 Sources used:\\b0\\par\n';
+    rtf += `\\fs20\\cf4 ${rtfEscape(sources)}\\fs22\\cf3\\par\n`;
+  }
+  rtf += '}';
+  return rtf;
+}
+
+function exportContent(rawMd, format, contentType, artifactType) {
+  if (format === 'copy') {
+    copyToClipboard(rawMd);
+    return;
+  }
+  if (format === 'txt') {
+    const cleanText = markdownToPlainText(rawMd);
+    const typeLine = artifactType ? `Artifact-Type: ${artifactType}\n` : '';
+    const header = `AMBITQA — EXPORT\nGenerated ${new Date().toLocaleDateString()} · ISTQB · IEEE 829 grounded\n${typeLine}${'═'.repeat(60)}\n\n`;
+    downloadFile(header + cleanText, buildFilename(rawMd, contentType, 'txt'), 'text/plain');
+    showToast('Downloaded as TXT'); return;
+  }
+  if (format === 'md') {
+    const typeComment = artifactType ? `<!-- ambitqa-artifact-type: ${artifactType} -->\n` : '';
+    const header = `<!-- AmbitQA Export · Generated ${new Date().toLocaleDateString()} · ISTQB · IEEE 829 grounded -->\n${typeComment}\n`;
+    downloadFile(header + rawMd, buildFilename(rawMd, contentType, 'md'), 'text/markdown');
+    showToast('Downloaded as Markdown'); return;
+  }
+  if (format === 'rtf') {
+    const rtf = generateRtf(rawMd);
+    downloadFile(rtf, buildFilename(rawMd, contentType, 'rtf'), 'application/rtf');
+    showToast('Downloaded as RTF — opens in TextEdit, Word, Pages');
+    return;
+  }
+  if (format === 'html') {
+    const { html } = renderMarkdown(rawMd);
+    const typeMeta = artifactType ? `<meta name="ambitqa-artifact-type" content="${artifactType}">` : '';
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8">${typeMeta}<title>AmbitQA Export</title><style>body{font-family:Inter,Helvetica,Arial,sans-serif;max-width:900px;margin:2rem auto;padding:0 1.5rem;color:#0F0E1F;line-height:1.65;background:#FFFFFF;}h1,h2,h3{font-family:'Space Grotesk',Helvetica,sans-serif;color:#312E81;line-height:1.3;}h1{font-size:1.8rem;margin:1.5rem 0 1rem;border-bottom:2px solid #312E81;padding-bottom:0.5rem;}h2{font-size:1.35rem;margin:1.8rem 0 0.75rem;border-bottom:1px solid #C7D2FE;padding-bottom:0.3rem;}h3{font-size:1.1rem;margin:1.2rem 0 0.5rem;}hr{border:0;border-top:1px solid #C7D2FE;margin:1.5rem 0;}p{margin:0.6rem 0;color:#0F0E1F;}strong{color:#0F0E1F;font-weight:700;}blockquote{margin:0.8rem 0;padding:0.4rem 1rem;border-left:3px solid #312E81;color:#4A4566;font-style:italic;}blockquote p{margin:0;color:#4A4566;}table{width:100%;border-collapse:collapse;margin:1rem 0;background:#FFFFFF;}th,td{border:1px solid #C7D2FE;padding:0.55rem 0.75rem;text-align:left;font-size:0.9rem;vertical-align:top;background:#FFFFFF;}th{font-weight:700;color:#312E81;border-bottom:2px solid #312E81;}td{color:#0F0E1F;}code{font-family:Menlo,monospace;font-size:0.88em;color:#312E81;}pre.code-block{background:#FFFFFF;border:1px solid #C7D2FE;border-left:3px solid #312E81;border-radius:3px;padding:0.75rem 1rem;margin:0.75rem 0;font-family:Menlo,monospace;font-size:0.85rem;line-height:1.55;color:#0F0E1F;overflow-x:auto;white-space:pre-wrap;word-break:break-word;}pre.code-block code{color:#0F0E1F;}ul,ol{padding-left:1.5rem;color:#0F0E1F;}li{margin-bottom:0.3rem;}.header{border-bottom:2px solid #312E81;padding-bottom:1rem;margin-bottom:2rem;}.header h1{border:none;padding:0;margin:0;}</style></head><body><div class="header"><h1>AmbitQA — Export</h1><p style="color:#4A4566;margin:0.3rem 0 0;">Generated ${new Date().toLocaleDateString()} · ISTQB · IEEE 829 grounded</p></div>${html}</body></html>`;
+    downloadFile(fullHtml, buildFilename(rawMd, contentType, 'html'), 'text/html');
+    showToast('Downloaded as HTML'); return;
+  }
+  if (format === 'jira') {
+    const tables = parseMarkdownTables(rawMd);
+    if (tables.length === 0) { showToast('No table found to export'); return; }
+    let csvRows;
+    if (contentType === 'testcases') {
+      csvRows = [['Issue Type','Summary','Description','Priority','Labels']];
+      const table = tables[0];
+      const header = table.rows[0].map(h => h.toLowerCase());
+      const idIdx = header.findIndex(h => h.includes('id'));
+      const titleIdx = header.findIndex(h => h.includes('title') || h.includes('scenario') || (h.includes('description') && header.length > 3));
+      const prioIdx = header.findIndex(h => h.includes('priority'));
+      const precondIdx = header.findIndex(h => h.includes('pre') || h.includes('condition'));
+      const stepsIdx = header.findIndex(h => h.includes('step'));
+      const expectedIdx = header.findIndex(h => h.includes('expected'));
+      const hasDetailCols = precondIdx >= 0 || stepsIdx >= 0 || expectedIdx >= 0;
+
+      for (let i = 1; i < table.rows.length; i++) {
+        const row = table.rows[i];
+        const id = idIdx >= 0 ? row[idIdx] : `TC-${i}`;
+        const title = titleIdx >= 0 ? row[titleIdx] : 'Untitled test case';
+        const priority = prioIdx >= 0 ? mapJiraPriority(row[prioIdx]) : 'Medium';
+        let desc = '';
+        if (hasDetailCols) {
+          if (precondIdx >= 0) desc += `*Pre-conditions:*\n${row[precondIdx]}\n\n`;
+          if (stepsIdx >= 0) desc += `*Steps:*\n${row[stepsIdx]}\n\n`;
+          if (expectedIdx >= 0) desc += `*Expected Result:*\n${row[expectedIdx]}`;
+        } else {
+          // Fallback: scan the raw markdown for a section matching this TC ID
+          const tcId = (id || '').replace(/[^\w-]/g, '').trim();
+          if (tcId) {
+            const sectionRe = new RegExp(`(?:^|\\n)#{1,4}\\s*${tcId}[\\s\\S]*?(?=\\n#{1,4}\\s|\\n---|$)`, 'i');
+            const match = rawMd.match(sectionRe);
+            if (match) {
+              desc = match[0].replace(/^#{1,4}\s*/, '').replace(/\*\*/g, '*').trim();
+            }
+          }
+          // If no section found, use the title with priority as minimal description
+          if (!desc) {
+            desc = `*Test:* ${title}\n*Priority:* ${priority}\n\n_Note: detailed steps were not provided in tabular form. See the full AmbitQA response for context._`;
+          }
+        }
+        csvRows.push(['Test', `${id}: ${title}`, desc.trim(), priority, 'AmbitQA,Test-Case']);
+      }
+    } else if (contentType === 'bugreport') {
+      csvRows = [['Issue Type','Summary','Description','Priority','Labels','Environment']];
+      const table = tables[0];
+      const fields = {};
+      for (const row of table.rows.slice(1)) {
+        if (row.length >= 2) fields[row[0].toLowerCase()] = row[1];
+      }
+      const title = fields['title'] || fields['summary'] || 'Untitled defect';
+      const severity = fields['severity'] || 'Medium';
+      const priority = mapJiraPriority(fields['priority'] || severity);
+      const env = fields['environment'] || '';
+      let desc = '';
+      if (fields['steps to reproduce']) desc += `*Steps to Reproduce:*\n${fields['steps to reproduce']}\n\n`;
+      if (fields['expected result'] || fields['expected']) desc += `*Expected Result:*\n${fields['expected result'] || fields['expected']}\n\n`;
+      if (fields['actual result'] || fields['actual']) desc += `*Actual Result:*\n${fields['actual result'] || fields['actual']}\n\n`;
+      if (fields['module'] || fields['component']) desc += `*Module:* ${fields['module'] || fields['component']}\n`;
+      if (fields['severity']) desc += `*Severity:* ${fields['severity']}\n`;
+      csvRows.push(['Bug', title, desc.trim(), priority, 'AmbitQA,Defect', env]);
+    } else {
+      showToast('Jira export works for test cases or bug reports'); return;
+    }
+    downloadFile(toCSV(csvRows), buildFilename(rawMd, contentType, 'jira.csv'), 'text/csv');
+    showToast('Downloaded Jira CSV');
+  }
+}
+
+function mapJiraPriority(p) {
+  if (!p) return 'Medium';
+  const x = p.toLowerCase();
+  if (x.includes('p1') || x.includes('blocker') || x.includes('critical')) return 'Highest';
+  if (x.includes('p2') || x.includes('high')) return 'High';
+  if (x.includes('p3') || x.includes('medium')) return 'Medium';
+  if (x.includes('p4') || x.includes('low')) return 'Low';
+  return 'Medium';
+}
+
+// ─── FORM-FILL DETECTION ───────────────────────────────
+function detectFormRequest(rawMd) {
+  const tables = parseMarkdownTables(rawMd);
+  if (tables.length === 0) return null;
+
+  // Check first table
+  const table = tables[0];
+  if (table.rows.length < 2) return null;
+  const header = table.rows[0].map(h => h.toLowerCase());
+
+  // Find label column (what the user needs to provide)
+  const labelKeywords = /what i need|field|question|item|name|detail|info/;
+  let labelIdx = header.findIndex(h => labelKeywords.test(h));
+
+  // If no label-like column but first column is "#"/number, use second column
+  if (labelIdx === -1 && /^[#\s]*$/.test(header[0]) && header.length > 1) {
+    labelIdx = 1;
+  }
+
+  // Check if text before the table is asking for input
+  const beforeTable = rawMd.split(/\n\|/)[0].toLowerCase();
+  const askingPattern = /please provide|details needed|i(?:'ll)? need|i need.*following|tell me about|let me know|fill in|need the following/;
+  const isAsking = askingPattern.test(beforeTable);
+
+  if (labelIdx === -1 || !isAsking) return null;
+
+  // Find example/hint column
+  const exampleIdx = header.findIndex(h => /example|hint|placeholder|description|format/.test(h));
+
+  // Extract fields from data rows
+  const fields = [];
+  for (let i = 1; i < table.rows.length; i++) {
+    const row = table.rows[i];
+    const label = row[labelIdx]?.trim();
+    if (!label || label.length < 2) continue;
+    const hint = exampleIdx >= 0 ? (row[exampleIdx]?.trim() || '') : '';
+    // Clean up label (remove markdown formatting)
+    const cleanLabel = label.replace(/\*\*/g, '').replace(/\*/g, '');
+    fields.push({ label: cleanLabel, hint: hint.replace(/\*\*/g, '').replace(/\*/g, '') });
+  }
+
+  return fields.length >= 2 ? fields : null;
+}
+
+let currentFormFields = null;
+
+function openFormModal(rawMd) {
+  const fields = detectFormRequest(rawMd);
+  if (!fields) { showToast('No form fields detected'); return; }
+  currentFormFields = fields;
+
+  const container = document.getElementById('formFieldsContainer');
+  container.innerHTML = fields.map((f, i) => {
+    const isShort = f.label.length < 30 && !/describe|explain|steps/i.test(f.label);
+    const inputType = isShort ? 'input' : 'textarea';
+    const hintHtml = f.hint ? `<span class="form-hint">e.g., ${f.hint.replace(/"/g, '&quot;')}</span>` : '';
+    return `<div class="form-field">
+      <label for="ff_${i}">${i+1}. ${f.label}</label>
+      ${hintHtml}
+      ${inputType === 'textarea'
+        ? `<textarea id="ff_${i}" rows="2" placeholder="${f.hint ? f.hint.replace(/"/g,'&quot;').slice(0,80) : ''}"></textarea>`
+        : `<input type="text" id="ff_${i}" placeholder="${f.hint ? f.hint.replace(/"/g,'&quot;').slice(0,80) : ''}" />`}
+    </div>`;
+  }).join('');
+
+  document.getElementById('formModal').style.display = 'flex';
+  setTimeout(() => document.getElementById('ff_0')?.focus(), 100);
+}
+
+function closeFormModal() {
+  document.getElementById('formModal').style.display = 'none';
+  currentFormFields = null;
+}
+
+function submitFormModal() {
+  if (!currentFormFields) return;
+  const answers = currentFormFields.map((f, i) => {
+    const el = document.getElementById('ff_' + i);
+    const val = el?.value.trim() || '_____';
+    return `${i+1}. ${f.label}: ${val}`;
+  }).join('\n');
+
+  const message = `Here are the details you requested:\n\n${answers}`;
+  closeFormModal();
+
+  // Send as user message
+  document.getElementById('userInput').value = message;
+  sendMessage();
+}
+
+// ─── DOM HELPERS ───────────────────────────────────────
+function buildExportToolbar(rawMd) {
+  const contentType = detectContentType(rawMd);
+  const hasTable = parseMarkdownTables(rawMd).length > 0;
+  const jiraEligible = hasTable && (contentType === 'testcases' || contentType === 'bugreport');
+  const formFields = detectFormRequest(rawMd);
+  const id = 'ex_' + Math.random().toString(36).slice(2,8);
+  window['_md_'+id] = rawMd;
+  window['_ct_'+id] = contentType;
+  // Capture once, then clear — this response either came from a tagged
+  // quick action (known artifact type) or a free-typed prompt (null,
+  // meaning the Evaluator falls back to its own keyword-based guess).
+  window['_at_'+id] = quickActionTypeHint;
+  quickActionTypeHint = null;
+  const icons = {
+    copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+    dl: '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+    jira: '<svg viewBox="0 0 24 24"><polygon points="3 12 12 3 21 12 12 21 3 12"/></svg>',
+    form: '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>'
+  };
+  return `<div class="export-toolbar">
+    ${formFields ? `<button class="export-btn form-fill" onclick="openFormModal(window['_md_${id}'])">${icons.form} Fill form (${formFields.length} fields)</button>` : ''}
+    <button class="export-btn" onclick="exportContent(window['_md_${id}'],'txt',window['_ct_${id}'],window['_at_${id}'])">${icons.dl} TXT</button>
+    <button class="export-btn" onclick="exportContent(window['_md_${id}'],'md',window['_ct_${id}'],window['_at_${id}'])">${icons.dl} MD</button>
+    <button class="export-btn" onclick="exportContent(window['_md_${id}'],'html',window['_ct_${id}'],window['_at_${id}'])">${icons.dl} HTML</button>
+    ${jiraEligible ? `<button class="export-btn jira" onclick="exportContent(window['_md_${id}'],'jira',window['_ct_${id}'],window['_at_${id}'])">${icons.jira} Jira CSV</button>` : ''}
+    <button class="export-btn evaluate-btn" onclick="openEvaluator(window['_md_${id}'],window['_at_${id}'])" title="Score this artifact against ISTQB/IEEE 829 rubrics">🔬 Evaluate</button>
+    <span class="pdf-hint" onclick="this.classList.toggle('show')">
+      <span class="pdf-hint-btn">ℹ︎ Format help</span>
+      <span class="pdf-hint-popup">
+        <strong>Export formats</strong>
+        <div><b>TXT</b> — clean plain text, formatting stripped</div>
+        <div><b>MD</b> — raw markdown (great for GitHub, Notion, Obsidian, devs)</div>
+        <div><b>HTML</b> — formatted document, opens in browser</div>
+        <div><b>Jira CSV</b> — for direct Jira import (when test cases/bugs detected)</div>
+        <div class="divider"></div>
+        <strong>Save as PDF</strong>
+        <div>Click <b>HTML</b> → open file in browser → <kbd>Cmd</kbd>+<kbd>P</kbd> (or <kbd>Ctrl</kbd>+<kbd>P</kbd>) → <b>Save as PDF</b></div>
+      </span>
+    </span>
+  </div>`;
+}
+
+function appendMessage(role, html, sourcesHtml = '', rawMarkdown = '') {
+  const msgs = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = `msg-row ${role}`;
+  const avatar = document.createElement('div');
+  avatar.className = `msg-avatar ${role}`;
+  avatar.textContent = role === 'agent' ? 'QA' : 'U';
+  const content = document.createElement('div');
+  content.className = 'msg-content';
+  const bubble = document.createElement('div');
+  bubble.className = 'msg-bubble';
+  bubble.innerHTML = html;
+  content.appendChild(bubble);
+
+  // Copy button for user messages
+  if (role === 'user') {
+    const copyBtn = document.createElement('button');
+    copyBtn.className = 'msg-copy-btn';
+    copyBtn.title = 'Copy message';
+    copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+    const rawText = bubble.textContent || bubble.innerText || '';
+    copyBtn.onclick = () => {
+      navigator.clipboard.writeText(rawText).then(() => {
+        copyBtn.classList.add('copied');
+        copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+        setTimeout(() => {
+          copyBtn.classList.remove('copied');
+          copyBtn.innerHTML = `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
+        }, 1500);
+      });
+    };
+    row.appendChild(copyBtn);
+  }
+
+  if (role === 'agent' && rawMarkdown) {
+    const toolbar = document.createElement('div');
+    toolbar.innerHTML = buildExportToolbar(rawMarkdown);
+    content.appendChild(toolbar.firstChild);
+  }
+  if (sourcesHtml) {
+    const chips = document.createElement('div');
+    chips.className = 'source-chips';
+    chips.innerHTML = sourcesHtml;
+    content.appendChild(chips);
+  }
+  row.appendChild(avatar);
+  row.appendChild(content);
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+}
+
+const SLOW_PROVIDERS = { google: true, xai: true, openrouter: true, custom: true };
+let patienceTimer = null;
+
+function showTyping() {
+  const msgs = document.getElementById('chatMessages');
+  const row = document.createElement('div');
+  row.className = 'msg-row agent'; row.id = 'typingRow';
+  row.innerHTML = `<div class="msg-avatar agent">QA</div><div style="display:flex;flex-direction:column;gap:0.5rem;"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div><span id="patienceMsg" style="display:none;font-size:0.8rem;color:var(--text-dim);font-style:italic;padding-left:0.25rem;">⏳ Still generating — large artifacts like RTMs and test plans can take 1–2 minutes with some providers. You can wait or click ⏹ Stop to cancel.</span></div>`;
+  msgs.appendChild(row);
+  msgs.scrollTop = msgs.scrollHeight;
+  // Show patience message after 30 seconds
+  const provider = localStorage.getItem('ambitqa-provider') || 'anthropic';
+  const delay = SLOW_PROVIDERS[provider] ? 20000 : 30000;
+  patienceTimer = setTimeout(() => {
+    const msg = document.getElementById('patienceMsg');
+    if (msg) { msg.style.display = 'block'; msgs.scrollTop = msgs.scrollHeight; }
+  }, delay);
+}
+
+function hideTyping() {
+  if (patienceTimer) { clearTimeout(patienceTimer); patienceTimer = null; }
+  document.getElementById('typingRow')?.remove();
+}
+
+async function sendMessage() {
+  const input = document.getElementById('userInput');
+  const btn = document.getElementById('sendBtn');
+  const text = input.value.trim();
+  if ((!text && pendingAttachments.length === 0) || !apiKey) return;
+
+  // Snapshot attachments and clear pending
+  const attachments = [...pendingAttachments];
+  pendingAttachments = [];
+  renderAttachmentPreview();
+
+  input.value = ''; input.style.height = 'auto';
+
+  // Build user message HTML with image thumbnails / PDF tags
+  const escapedText = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  let attachmentsHtml = '';
+  if (attachments.length > 0) {
+    const images = attachments.filter(a => a.kind === 'image').map(a =>
+      `<img class="msg-image" src="${a.dataUrl}" alt="${a.name}" onclick="window.open(this.src,'_blank')" />`
+    ).join('');
+    const pdfs = attachments.filter(a => a.kind === 'pdf').map(a =>
+      `<span class="msg-pdf-tag"><svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>${a.name}</span>`
+    ).join('');
+    const htmls = attachments.filter(a => a.kind === 'html').map(a =>
+      `<span class="msg-pdf-tag" style="color:var(--violet-400);"><svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>${a.name}</span>`
+    ).join('');
+    attachmentsHtml = (images ? `<div class="msg-images">${images}</div>` : '') + pdfs + htmls;
+  }
+  const userHtml = attachmentsHtml + (escapedText || (attachments.length ? '<em style="opacity:0.7">[analyzing attached content]</em>' : ''));
+  appendMessage('user', userHtml);
+
+  btn.disabled = true;
+  document.getElementById('stopBtn').style.display = 'flex';
+  showTyping();
+  try {
+    const { text: reply, chunks, wasTruncated } = await callLLM(text, attachments);
+    hideTyping();
+    const { html, sourcesHtml, rawMarkdown } = renderMarkdown(reply);
+    const seenSrc = new Set();
+    const fallback = chunks
+      .map(c => c.source)
+      .filter(s => { const k = s.toLowerCase(); if (seenSrc.has(k)) return false; seenSrc.add(k); return true; })
+      .map(s => `<span class="source-chip">${s}</span>`)
+      .join('');
+    const truncatedNotice = wasTruncated
+      ? `<div id="truncNotice" style="margin-top:1rem;padding:0.9rem 1.1rem;background:color-mix(in srgb,var(--orange-400) 18%,transparent);border:2px solid var(--orange-400);border-radius:var(--r-md);font-size:0.92rem;color:var(--orange-400);font-weight:600;display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;">
+          <span>⚠️ Response was cut off before finishing. Click Continue to resume from where it stopped.</span>
+          <button onclick="sendStarter('Please continue exactly where you left off — do NOT repeat or summarize what you already wrote. Pick up mid-sentence if needed and complete the remaining sections.')" style="background:var(--orange-400);color:#fff;border:none;padding:0.5rem 1.1rem;border-radius:var(--r-md);font-size:0.92rem;font-weight:700;cursor:pointer;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.15);">Continue →</button>
+        </div>`
+      : '';
+    // Subtle 'continue' hint for substantial responses where truncation isn't auto-detected
+    const continueHint = (!wasTruncated && reply.length > 500)
+      ? `<div class="continue-hint">💡 If the response looks incomplete, ask me to <em>"continue"</em>, <em>"add more sections"</em>, or <em>"generate the rest"</em></div>`
+      : '';
+    appendMessage('agent', html + truncatedNotice + continueHint, sourcesHtml || fallback, rawMarkdown);
+    if (wasTruncated) {
+      setTimeout(() => document.getElementById('truncNotice')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 200);
+    }
+  } catch (err) {
+    hideTyping();
+    if (err.name === 'AbortError') {
+      appendMessage('agent', `<p style="color:var(--text-muted);font-style:italic;">⏹ Generation stopped.</p>`);
+    } else {
+      // Show modal with error message for API key issues
+      const isAuthError = err.message.includes('401') || err.message.includes('403') ||
+        err.message.includes('authentication') || err.message.includes('API key') ||
+        err.message.includes('invalid') || err.message.includes('Unauthorized');
+      if (isAuthError) {
+        const errDiv = document.getElementById('apiModalError');
+        if (errDiv) {
+          errDiv.textContent = '⚠️ API key error: ' + err.message + ' — please check your key and try again.';
+          errDiv.style.display = 'block';
+        }
+        // Clear the bad key
+        apiKey = '';
+        const input = document.getElementById('apiKeyInput');
+        if (input) input.value = '';
+        document.getElementById('apiModal').style.display = 'flex';
+      } else {
+        appendMessage('agent', `<p style="color:var(--rose-400)">Error: ${err.message}. Please check your API key and try again.</p>`);
+      }
+    }
+  }
+  btn.disabled = false;
+  document.getElementById('stopBtn').style.display = 'none';
+  currentAbortController = null;
+  input.focus();
+}
+
+function stopGeneration() {
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+}
+
+// ─── UI ────────────────────────────────────────────────
+function handleKey(e) {
+  const box = document.getElementById('suggestBox');
+  const showing = box?.classList.contains('show');
+  if (showing) {
+    const items = [...box.querySelectorAll('.suggest-item')];
+    const activeIdx = items.findIndex(it => it.classList.contains('active'));
+    if (e.key === 'ArrowDown') { e.preventDefault();
+      const next = (activeIdx + 1) % items.length;
+      items.forEach((it, i) => it.classList.toggle('active', i === next));
+      items[next].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'ArrowUp') { e.preventDefault();
+      const prev = (activeIdx - 1 + items.length) % items.length;
+      items.forEach((it, i) => it.classList.toggle('active', i === prev));
+      items[prev].scrollIntoView({ block: 'nearest' });
+      return;
+    }
+    if (e.key === 'Enter' && !e.shiftKey && activeIdx >= 0) {
+      e.preventDefault();
+      const text = items[activeIdx].dataset.value;
+      document.getElementById('userInput').value = text;
+      suppressSuggest = true;
+      hideSuggestions();
+      autoResize(document.getElementById('userInput'));
+      return;
+    }
+    if (e.key === 'Escape') { hideSuggestions(); return; }
+    if (e.key === 'Tab' && activeIdx >= 0) {
+      e.preventDefault();
+      document.getElementById('userInput').value = items[activeIdx].dataset.value;
+      suppressSuggest = true;
+      hideSuggestions();
+      autoResize(document.getElementById('userInput'));
+      return;
+    }
+  }
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+// Curated common QA prompts that work across modes — broad coverage for autosuggest
+const COMMON_PROMPTS = [
+  // Requirements & planning
+  'Generate user stories with acceptance criteria',
+  'Create a requirements document for the target application',
+  'Identify ambiguous or untestable requirements',
+  'Write a risk-based test strategy',
+  'Write a test plan for the target application',
+  'Generate entry and exit criteria for testing',
+  // Test design
+  'Generate test cases for the target application',
+  'Generate boundary value analysis test cases',
+  'Create equivalence partitioning test cases',
+  'Write decision table test cases',
+  'Generate state transition test cases',
+  'Generate negative and edge case scenarios',
+  // BDD / Gherkin
+  'Write BDD Gherkin scenarios for the main user flow',
+  'Convert manual test cases to Gherkin format',
+  'Generate Cucumber feature files for the target application',
+  // Bug reporting
+  'Create a bug report for an issue I found',
+  'Write a defect report following IEEE 829',
+  'Suggest severity and priority for this defect',
+  'Create a regression test case for a bug fix',
+  // Test execution
+  'Create a test execution summary report',
+  'Generate a daily test execution status template',
+  'Create a smoke test suite for the target application',
+  'Create a sanity test checklist',
+  // Automation
+  'Generate a Playwright Page Object Model',
+  'Create a Cypress test framework',
+  'Write Selenium WebDriver tests with pytest',
+  'Generate Cucumber step definitions',
+  'Convert manual test cases to automation scripts',
+  'Create a CI/CD GitHub Actions workflow for tests',
+  'Generate test fixtures and mock data',
+  // Specialty test types
+  'Generate accessibility test cases (WCAG 2.1 AA)',
+  'Create performance test scenarios',
+  'Write API contract tests',
+  'Generate security test cases for the login flow',
+  'Create exploratory test charters',
+  'Write cross-browser compatibility test cases',
+  'Generate mobile responsive test cases',
+  // Coverage & closure
+  'Generate a Requirements Traceability Matrix',
+  'Identify the top risks for testing',
+  'Create a test coverage analysis report',
+  'Write a lessons learned document',
+];
+
+let suppressSuggest = false;
+
+function getAllSuggestions() {
+  const modeActions = ((modeInfo[currentMode] || modeInfo.general).actions || []).map(a => a.text);
+  // Mode actions take priority, then common prompts that aren't duplicates
+  const seen = new Set(modeActions.map(a => a.toLowerCase()));
+  const extras = COMMON_PROMPTS.filter(p => !seen.has(p.toLowerCase()));
+  return [...modeActions, ...extras];
+}
+
+function updateSuggestions(query) {
+  if (suppressSuggest) { suppressSuggest = false; return; }
+  const box = document.getElementById('suggestBox');
+  const q = query.trim().toLowerCase();
+  // Only show suggestions when the user is actively typing — never on empty/focus
+  if (q.length < 2) return hideSuggestions();
+  const all = getAllSuggestions();
+  const matches = all.filter(s => {
+    const sl = s.toLowerCase();
+    // Match if all words in query are contained in the suggestion
+    return q.split(/\s+/).every(word => sl.includes(word));
+  }).slice(0, 6);
+  // If the query exactly matches a suggestion, the user already picked it — don't show
+  if (matches.length === 1 && matches[0].toLowerCase() === q) return hideSuggestions();
+  if (matches.length === 0) return hideSuggestions();
+  const items = matches.map((s, i) => {
+    const safe = s.replace(/'/g, '&apos;').replace(/"/g, '&quot;');
+    return `<div class="suggest-item${i === 0 ? ' active' : ''}" data-value="${safe}" onmousedown="event.preventDefault(); pickSuggestion('${s.replace(/'/g, "\\'")}')">
+      <span class="suggest-arrow">→</span><span>${s}</span><span class="suggest-kbd">↵</span>
+    </div>`;
+  }).join('');
+  const footer = `<div class="suggest-footer"><span>↑↓ navigate</span><span>↵ select</span><span>Esc dismiss</span></div>`;
+  box.innerHTML = items + footer;
+  box.classList.add('show');
+}
+
+function pickSuggestion(text) {
+  const input = document.getElementById('userInput');
+  input.value = text;
+  hideSuggestions();
+  suppressSuggest = true;  // Prevent the next focus event from re-opening the menu
+  autoResize(input);
+  input.focus();
+}
+
+function hideSuggestions() {
+  document.getElementById('suggestBox')?.classList.remove('show');
+}
+
+function scrollToBottom() {
+  const msgs = document.getElementById('chatMessages');
+  msgs.scrollTo({ top: msgs.scrollHeight, behavior: 'smooth' });
+}
+
+function scrollToTop() {
+  const msgs = document.getElementById('chatMessages');
+  msgs.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Show/hide scroll buttons based on scroll position, and keep them
+// positioned relative to the chat column's actual edges (not hardcoded
+// rem values), so they never collide with the input bar's send/stop
+// buttons and never go stale when a side panel is toggled/resized.
+//
+// These are top-level (not nested in initScrollBtn) so togglePanel() can
+// call them directly too — belt-and-suspenders alongside the
+// ResizeObserver below, since a sibling flipping to/from display:none
+// is an edge case that doesn't always fire as reliably or as promptly
+// as a genuine size change on the observed element itself.
+function updateScrollBtnVisibility() {
+  const msgs = document.getElementById('chatMessages');
+  const downBtn = document.getElementById('scrollDownBtn');
+  const upBtn = document.getElementById('scrollUpBtn');
+  if (!msgs || !downBtn || !upBtn) return;
+  const distFromBottom = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight;
+  const distFromTop = msgs.scrollTop;
+  // Down arrow: show when scrolled up more than 200px from bottom
+  downBtn.classList.toggle('show', distFromBottom > 200);
+  // Up arrow: show when scrolled down more than 200px from top
+  upBtn.classList.toggle('show', distFromTop > 200);
+}
+
+function repositionScrollBtns() {
+  const msgs = document.getElementById('chatMessages');
+  const inputArea = document.getElementById('chatInputArea');
+  const downBtn = document.getElementById('scrollDownBtn');
+  const upBtn = document.getElementById('scrollUpBtn');
+  if (!msgs || !inputArea || !downBtn || !upBtn) return;
+  const msgsRect = msgs.getBoundingClientRect();
+  const inputRect = inputArea.getBoundingClientRect();
+  // Horizontal: hug the chat column's real right edge (not the raw
+  // viewport edge), so it doesn't land on the right sidebar when open.
+  const rightOffset = Math.max(0, window.innerWidth - msgsRect.right) + 24;
+  // Vertical: clear the input bar's actual current height/top (which
+  // changes as the textarea grows, attachments/hints appear, etc.)
+  // instead of a fixed rem guess that can collide with send/stop.
+  const downBottom = Math.max(0, window.innerHeight - inputRect.top) + 12;
+  downBtn.style.right = rightOffset + 'px';
+  upBtn.style.right = rightOffset + 'px';
+  downBtn.style.bottom = downBottom + 'px';
+  upBtn.style.bottom = (downBottom + 46) + 'px'; // stack above the down button
+}
+
+// NOTE: init is deferred via DOMContentLoaded because the button elements
+// are declared in the HTML *after* this <script> block closes — querying
+// for them synchronously here would return null and silently no-op.
+function initScrollBtn() {
+  const msgs = document.getElementById('chatMessages');
+  const inputArea = document.getElementById('chatInputArea');
+  const downBtn = document.getElementById('scrollDownBtn');
+  const upBtn = document.getElementById('scrollUpBtn');
+  if (!msgs || !inputArea || !downBtn || !upBtn) return;
+
+  msgs.addEventListener('scroll', updateScrollBtnVisibility);
+
+  // A ResizeObserver on the elements that actually matter covers most
+  // causes of layout shift automatically: panel drag-resize, window
+  // resize, textarea auto-grow, attachment previews, and the "still
+  // generating" hint appearing. Panel open/close is also handled
+  // explicitly in togglePanel() as a belt-and-suspenders measure.
+  const ro = new ResizeObserver(() => { repositionScrollBtns(); updateScrollBtnVisibility(); });
+  ro.observe(msgs);
+  ro.observe(inputArea);
+
+  repositionScrollBtns();
+  updateScrollBtnVisibility();
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initScrollBtn);
+} else {
+  initScrollBtn();
+}
+
+// Cancel provider change — restore previous key and close modal
+let previousApiKey = '';
+let previousProvider = '';
+// Tracks which provider the in-memory apiKey actually belongs to — read by
+// callLLM() so an in-progress (unconfirmed) provider switch in the UI never
+// causes a request to be sent under the wrong provider's key/endpoint.
+let activeProvider = 'anthropic';
+function cancelProviderChange() {
+  if (previousApiKey) {
+    apiKey = previousApiKey;
+    previousApiKey = '';
+  }
+  if (previousProvider) {
+    activeProvider = previousProvider;
+    previousProvider = '';
+  }
+  document.getElementById('apiModal').style.display = 'none';
+  document.getElementById('modalCancelBtn').style.display = 'none';
+  // Restore provider/model in nav + localStorage to match the key we kept.
+  // (previousProvider was captured before onProviderChange's localStorage
+  // write, so this correctly reverts — reading localStorage here directly
+  // would incorrectly show the provider being switched to, not away from.)
+  const restoredProvider = activeProvider;
+  localStorage.setItem('ambitqa-provider', restoredProvider);
+  const navProvider = document.getElementById('providerSelect');
+  const navModel = document.getElementById('modelSelect');
+  if (navProvider) navProvider.value = restoredProvider;
+  if (navModel) {
+    populateModelSelect('modelSelect', restoredProvider);
+    const savedModel = localStorage.getItem('ambitqa-model');
+    if (savedModel) navModel.value = savedModel;
+  }
+  const modalProvider = document.getElementById('modalProviderSelect');
+  if (modalProvider) { modalProvider.value = restoredProvider; populateModelSelect('modalModelSelect', restoredProvider); }
+  const customInput = document.getElementById('customModelInput');
+  const endpointInput = document.getElementById('customEndpointInput');
+  if (restoredProvider === 'custom') {
+    if (customInput) customInput.classList.add('show');
+    if (endpointInput) endpointInput.classList.add('show');
+  } else {
+    if (customInput) customInput.classList.remove('show');
+    if (endpointInput) endpointInput.classList.remove('show');
+  }
+}
+
+function autoResize(el) { el.style.height = 'auto'; el.style.height = Math.min(el.scrollHeight, 160) + 'px'; }
+// Set by sendStarter() right before a quick-action-triggered generation,
+// consumed once by buildExportToolbar() when that response renders, then
+// cleared — so it never leaks onto a later, unrelated free-typed message.
+let quickActionTypeHint = null;
+
+function sendStarter(msg, type = null) {
+  quickActionTypeHint = type;
+  document.getElementById('userInput').value = msg;
+  sendMessage();
+}
+
+function setTargetStatus(type, message) {
+  const el = document.getElementById('targetStatus');
+  el.className = 'target-status show ' + type;
+  el.innerHTML = message;
+}
+
+function updateTargetBanner() {
+  const banner = document.getElementById('targetBanner');
+  const urlEl = document.getElementById('targetBannerUrl');
+  const modeEl = document.getElementById('targetBannerMode');
+  if (targetApp.url) {
+    banner.classList.add('show');
+    urlEl.textContent = targetApp.url;
+    urlEl.href = targetApp.url;
+    if (targetApp.fetchStatus === 'fetched') modeEl.textContent = '✓ Page HTML loaded';
+    else if (targetApp.fetchStatus === 'failed') modeEl.textContent = '⚠ URL only (CORS blocked)';
+    else modeEl.textContent = 'URL + description mode';
+  } else banner.classList.remove('show');
+}
+
+function clearTarget() {
+  targetApp = { url: '', description: '', pageContent: '', fetchStatus: 'none' };
+  document.getElementById('targetUrl').value = '';
+  document.getElementById('targetDesc').value = '';
+  document.getElementById('targetStatus').className = 'target-status';
+  document.getElementById('targetStatus').innerHTML = '';
+  document.getElementById('fetchBtnText').textContent = 'Set Target';
+  updateTargetBanner();
+  showToast('Target cleared');
+}
+
+function extractReadableContent(html) {
+  html = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '').replace(/<!--[\s\S]*?-->/g, '');
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  let summary = '';
+  const title = doc.querySelector('title')?.textContent?.trim();
+  if (title) summary += `PAGE TITLE: ${title}\n\n`;
+  const metaDesc = doc.querySelector('meta[name="description"]')?.getAttribute('content');
+  if (metaDesc) summary += `META DESCRIPTION: ${metaDesc}\n\n`;
+  const headings = [...doc.querySelectorAll('h1, h2, h3')].map(h => `${h.tagName}: ${h.textContent.trim()}`).filter(t => t.length < 200);
+  if (headings.length) summary += `HEADINGS:\n${headings.slice(0, 20).join('\n')}\n\n`;
+  const forms = [...doc.querySelectorAll('form')];
+  if (forms.length) {
+    summary += `FORMS FOUND (${forms.length}):\n`;
+    forms.slice(0, 5).forEach((form, i) => {
+      summary += `Form ${i+1}:\n`;
+      if (form.action) summary += `  Action: ${form.action}\n`;
+      if (form.method) summary += `  Method: ${form.method}\n`;
+      [...form.querySelectorAll('input, textarea, select')].forEach(f => {
+        const type = f.type || f.tagName.toLowerCase();
+        const name = f.name || f.id || '(unnamed)';
+        const placeholder = f.placeholder ? ` placeholder="${f.placeholder}"` : '';
+        const required = f.required ? ' [required]' : '';
+        summary += `  - ${type}: ${name}${placeholder}${required}\n`;
+      });
+    });
+    summary += '\n';
+  }
+  const buttons = [...doc.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, a.button')];
+  if (buttons.length) {
+    const labels = buttons.map(b => (b.textContent || b.value || '').trim()).filter(l => l && l.length < 60);
+    const unique = [...new Set(labels)].slice(0, 25);
+    if (unique.length) summary += `BUTTONS / CTAs:\n${unique.map(l => `- "${l}"`).join('\n')}\n\n`;
+  }
+  const navLinks = [...doc.querySelectorAll('nav a, header a')].map(a => a.textContent.trim()).filter(l => l && l.length < 50);
+  if (navLinks.length) {
+    const unique = [...new Set(navLinks)].slice(0, 20);
+    summary += `NAVIGATION LINKS:\n${unique.map(l => `- ${l}`).join('\n')}\n\n`;
+  }
+  const bodyText = doc.body?.textContent?.replace(/\s+/g, ' ').trim() || '';
+  if (bodyText) summary += `PAGE TEXT EXCERPT:\n${bodyText.slice(0, 1200)}${bodyText.length > 1200 ? '...' : ''}\n`;
+  return summary.slice(0, 6000);
+}
+
+async function fetchTarget() {
+  const url = document.getElementById('targetUrl').value.trim();
+  const desc = document.getElementById('targetDesc').value.trim();
+  if (!url) { setTargetStatus('error', 'Please enter a URL.'); return; }
+  // Normalize: accept inputs like "example.com", "www.example.com", "https://example.com", "http://example.com"
+  let normalized = url;
+  if (!/^https?:\/\//i.test(normalized)) {
+    normalized = 'https://' + normalized.replace(/^\/+/, '');
+  }
+  let parsedUrl;
+  try { parsedUrl = new URL(normalized); }
+  catch (e) { setTargetStatus('error', 'Invalid URL. Try: example.com or www.example.com'); return; }
+  const finalUrl = parsedUrl.toString();
+  targetApp.url = finalUrl;
+  targetApp.description = desc;
+  document.getElementById('targetUrl').value = finalUrl;
+  const fetchBtn = document.getElementById('fetchBtn');
+  const fetchBtnText = document.getElementById('fetchBtnText');
+  fetchBtn.disabled = true;
+  fetchBtnText.textContent = 'Fetching…';
+  setTargetStatus('loading', '⏳ Attempting to fetch page content via CORS proxy…');
+  const proxies = [
+    // Primary: dedicated Cloudflare Worker (see DEPLOY_INSTRUCTIONS.md).
+    // Dedicated Cloudflare Worker — replaces flaky free public proxies.
+    `https://ambitqa-cors-proxy.hkapur-qa.workers.dev/?url=${encodeURIComponent(finalUrl)}`,
+    // Fallbacks: free public proxies, kept in case the Worker has an issue.
+    `https://api.allorigins.win/raw?url=${encodeURIComponent(finalUrl)}`,
+    `https://corsproxy.io/?${encodeURIComponent(finalUrl)}`,
+    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(finalUrl)}`,
+  ];
+  async function tryProxies() {
+    let html = null, lastErr = '';
+    for (const proxyUrl of proxies) {
+      try {
+        const resp = await fetch(proxyUrl, { signal: AbortSignal.timeout(15000) });
+        if (resp.ok) {
+          const text = await resp.text();
+          if (text && text.length > 200 && text.toLowerCase().includes('<')) { html = text; break; }
+          lastErr = 'Empty or invalid response';
+        } else lastErr = `HTTP ${resp.status}`;
+      } catch (e) { lastErr = e.message || 'Network error'; }
+    }
+    return { html, lastErr };
+  }
+  let { html, lastErr } = await tryProxies();
+  if (!html) {
+    // These free proxies fail transiently fairly often (rate limits,
+    // brief server errors). One short retry pass after a couple of
+    // seconds resolves a meaningful fraction of those without making
+    // the user manually click "Fetch" again.
+    setTargetStatus('loading', '⏳ First attempt failed, retrying once…');
+    await new Promise(r => setTimeout(r, 2000));
+    ({ html, lastErr } = await tryProxies());
+  }
+  if (html) {
+    targetApp.pageContent = extractReadableContent(html);
+    targetApp.fetchStatus = 'fetched';
+    setTargetStatus('success', `✓ <strong>Page loaded successfully</strong><br>Extracted ${targetApp.pageContent.length.toLocaleString()} chars of structure. Test cases will reference real elements.`);
+    fetchBtnText.textContent = '✓ Target Set';
+  } else {
+    targetApp.pageContent = '';
+    targetApp.fetchStatus = 'failed';
+    setTargetStatus('partial', `⚠ <strong>Page HTML could not be fetched</strong> (${lastErr}). Falling back to URL + description mode.`);
+    fetchBtnText.textContent = '✓ Target Set (URL only)';
+  }
+  fetchBtn.disabled = false;
+  updateTargetBanner();
+  showToast(html ? 'Target loaded with page HTML' : 'Target set (URL only)');
+}
+
+function renderActions(mode) {
+  const info = modeInfo[mode] || modeInfo.general;
+  document.getElementById('actionsLabel').textContent = info.actionsLabel;
+  const list = document.getElementById('actionsList');
+  list.innerHTML = info.actions.map(a => {
+    const safe = a.text.replace(/'/g,"\\'").replace(/"/g,'&quot;');
+    const typeArg = a.type ? `'${a.type}'` : 'null';
+    return `<button class="action-btn" onclick="sendStarter('${safe}', ${typeArg})"><span class="action-arrow">→</span><span>${a.text}</span></button>`;
+  }).join('');
+}
+
+function setMode(btn, mode) {
+  document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  currentMode = mode;
+  const info = modeInfo[mode] || modeInfo.general;
+  document.getElementById('modeBarLabel').textContent = info.label;
+  document.getElementById('modeBarDesc').textContent = ' ' + info.desc;
+  renderActions(mode);
+  showToast('Mode: ' + info.label);
+}
+
+let toastTimer;
+function showToast(msg) {
+  let toast = document.getElementById('qaToast');
+  if (!toast) { toast = document.createElement('div'); toast.id = 'qaToast'; toast.className = 'toast'; document.body.appendChild(toast); }
+  toast.textContent = '✓ ' + msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+}
+
+// Model IDs verified current as of July 2026 — this space moves fast
+// (providers deprecate/shut down model IDs every few months), so if you
+// start seeing 404s again, that's the first thing to re-check.
+const PROVIDER_MODELS = {
+  anthropic: ['claude-sonnet-4-6','claude-opus-4-5','claude-haiku-4-5'],
+  openai: ['gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna'],
+  google: ['gemini-2.5-pro','gemini-2.5-flash','gemini-3.5-flash'],
+  xai: ['grok-4.3','grok-4.1-fast'],
+  openrouter: ['openai/gpt-5.6-sol','anthropic/claude-sonnet-4-6','google/gemini-2.5-pro'],
+  custom: ['custom-model']
+};
+// Native/direct endpoints. Google and Custom are built dynamically at call
+// time (Google needs the model + key in the URL; Custom's URL is user-supplied).
+const PROVIDER_ENDPOINTS = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  xai: 'https://api.x.ai/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+};
+function saveCustomEndpoint(val) {
+  if (val) localStorage.setItem('ambitqa-custom-endpoint', val.trim());
+}
+const PROVIDER_PLACEHOLDERS = {
+  anthropic: 'sk-ant-...',
+  openai: 'sk-...',
+  google: 'AIza...',
+  xai: 'xai-...',
+  openrouter: 'sk-or-...',
+  custom: 'Your API key...'
+};
+
+function populateModelSelect(selectId, provider) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const models = PROVIDER_MODELS[provider] || [];
+  sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+const PROVIDER_LABELS = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  xai: 'xAI',
+  openrouter: 'OpenRouter',
+  custom: 'Custom'
+};
+
+const PROVIDER_CONSOLES = {
+  anthropic: 'console.anthropic.com',
+  openai: 'platform.openai.com',
+  google: 'aistudio.google.com',
+  xai: 'console.x.ai',
+  openrouter: 'openrouter.ai/keys',
+  custom: 'your provider console'
+};
+
+function updateModalForProvider(p) {
+  const input = document.getElementById('apiKeyInput');
+  const label = document.getElementById('apiKeyLabel');
+  const consoleLink = document.getElementById('apiConsoleLink');
+  const speedNote = document.getElementById('providerSpeedNote');
+  if (input) input.placeholder = PROVIDER_PLACEHOLDERS[p] || 'API key...';
+  if (label) label.textContent = (PROVIDER_LABELS[p] || p) + ' API Key';
+  if (consoleLink) {
+    const url = 'https://' + (PROVIDER_CONSOLES[p] || 'console.anthropic.com');
+    consoleLink.href = url;
+    consoleLink.textContent = PROVIDER_CONSOLES[p] || 'console.anthropic.com';
+  }
+  // Show speed warning for slower providers
+  if (speedNote) {
+    speedNote.style.display = SLOW_PROVIDERS[p] ? 'block' : 'none';
+  }
+  // Show the Custom Endpoint URL field only when Custom is selected
+  const endpointWrap = document.getElementById('modalCustomEndpointWrap');
+  const endpointInput = document.getElementById('modalCustomEndpointInput');
+  if (endpointWrap) endpointWrap.style.display = (p === 'custom') ? 'flex' : 'none';
+  if (endpointInput && p === 'custom') {
+    endpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || '';
+  }
+}
+
+function onModalProviderChange() {
+  const p = document.getElementById('modalProviderSelect').value;
+  populateModelSelect('modalModelSelect', p);
+  updateModalForProvider(p);
+  // Sync nav provider select without triggering key-clear flow
+  const navProvider = document.getElementById('providerSelect');
+  if (navProvider) {
+    navProvider.value = p;
+    // Call provider change side effects (custom input, localStorage) but skip key prompt
+    populateModelSelect('modelSelect', p);
+    const customInput = document.getElementById('customModelInput');
+    const endpointInput = document.getElementById('customEndpointInput');
+    const modelSel = document.getElementById('modelSelect');
+    if (p === 'custom') {
+      if (customInput) customInput.classList.add('show');
+      if (endpointInput) { endpointInput.classList.add('show'); endpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || ''; }
+      if (modelSel) modelSel.style.display = 'none';
+    } else {
+      if (customInput) customInput.classList.remove('show');
+      if (endpointInput) endpointInput.classList.remove('show');
+      if (modelSel) modelSel.style.display = '';
+    }
+    localStorage.setItem('ambitqa-provider', p);
+  }
+}
+
+function onProviderChange() {
+  const p = document.getElementById('providerSelect').value;
+  populateModelSelect('modelSelect', p);
+  const modalProvider = document.getElementById('modalProviderSelect');
+  if (modalProvider) { modalProvider.value = p; populateModelSelect('modalModelSelect', p); }
+  // Show custom model/endpoint inputs when "custom" selected
+  const customInput = document.getElementById('customModelInput');
+  const endpointInput = document.getElementById('customEndpointInput');
+  const modelSel = document.getElementById('modelSelect');
+  if (p === 'custom') {
+    if (customInput) customInput.classList.add('show');
+    if (endpointInput) { endpointInput.classList.add('show'); endpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || ''; }
+    if (modelSel) modelSel.style.display = 'none';
+  } else {
+    if (customInput) customInput.classList.remove('show');
+    if (endpointInput) endpointInput.classList.remove('show');
+    if (modelSel) modelSel.style.display = '';
+  }
+
+  // Clear existing key and prompt for new one when provider changes
+  // (only if a key was already entered — not on initial page load)
+  if (apiKey) {
+    previousProvider = activeProvider;  // capture BEFORE localStorage is overwritten below, so Cancel can restore the exact prior provider
+    localStorage.setItem('ambitqa-provider', p);
+    previousApiKey = apiKey;  // save so Cancel can restore it
+    apiKey = '';
+    const input = document.getElementById('apiKeyInput');
+    if (input) input.value = '';
+    // Clear error banner if showing
+    const errDiv = document.getElementById('apiModalError');
+    if (errDiv) errDiv.style.display = 'none';
+    // Update modal label/placeholder/link for new provider
+    updateModalForProvider(p);
+    // Show Cancel button so user can keep current key
+    const cancelBtn = document.getElementById('modalCancelBtn');
+    if (cancelBtn) cancelBtn.style.display = 'inline-block';
+    // Show modal asking for new provider's key
+    document.getElementById('apiModal').style.display = 'flex';
+  } else {
+    localStorage.setItem('ambitqa-provider', p);
+  }
+}
+
+// Opens the API key modal for whichever provider is currently selected in
+// the nav — for re-entering/fixing a key without needing to switch providers
+// away and back. The key field is intentionally left blank (keys are never
+// persisted, matching the existing session-only security model).
+function openKeyModalForCurrentProvider() {
+  const p = document.getElementById('providerSelect')?.value || 'anthropic';
+  const modalProvider = document.getElementById('modalProviderSelect');
+  if (modalProvider) {
+    modalProvider.value = p;
+    populateModelSelect('modalModelSelect', p);
+    const mm = document.getElementById('modalModelSelect');
+    if (mm) {
+      const currentModel = (p === 'custom')
+        ? (document.getElementById('customModelInput')?.value || 'custom-model')
+        : (document.getElementById('modelSelect')?.value || PROVIDER_MODELS[p]?.[0]);
+      if (currentModel && PROVIDER_MODELS[p]?.includes(currentModel)) mm.value = currentModel;
+    }
+  }
+  updateModalForProvider(p);
+  const errDiv = document.getElementById('apiModalError');
+  if (errDiv) errDiv.style.display = 'none';
+  const input = document.getElementById('apiKeyInput');
+  if (input) input.value = '';
+  // If there's already a working key, remember it so "Keep current" can restore it
+  if (apiKey) { previousApiKey = apiKey; previousProvider = activeProvider; }
+  const cancelBtn = document.getElementById('modalCancelBtn');
+  if (cancelBtn) cancelBtn.style.display = apiKey ? 'inline-block' : 'none';
+  document.getElementById('apiModal').style.display = 'flex';
+}
+
+function onModelChange() {
+  const val = document.getElementById('modelSelect')?.value;
+  if (val) localStorage.setItem('ambitqa-model', val);
+}
+
+function saveCustomModel(val) {
+  if (val) localStorage.setItem('ambitqa-custom-model', val.trim());
+}
+
+function openEvaluator(rawMd, artifactType) {
+  if (rawMd) {
+    try { sessionStorage.setItem('ambitqa_eval_artifact', rawMd); } catch(e) {}
+  } else {
+    // Standalone launch (e.g. top-nav button) with no artifact to pass —
+    // clear any leftover value from an earlier per-response "Evaluate"
+    // click this session, so the Evaluator opens genuinely blank.
+    try { sessionStorage.removeItem('ambitqa_eval_artifact'); } catch(e) {}
+  }
+  // Pass along the known artifact type (from the quick action that
+  // generated this response, if any) so the Evaluator can pre-select the
+  // Deliverable Type dropdown instead of falling back to its own
+  // keyword-based auto-detect. Free-typed prompts have no known type
+  // (artifactType is null/undefined), so this is cleared in that case —
+  // same reasoning as clearing the artifact above.
+  try {
+    if (artifactType) sessionStorage.setItem('ambitqa_eval_type', artifactType);
+    else sessionStorage.removeItem('ambitqa_eval_type');
+  } catch(e) {}
+  // Pass along the currently active provider/model so the Evaluator opens
+  // pre-selected to match, rather than defaulting to Anthropic regardless
+  // of what's actually in use here.
+  try {
+    sessionStorage.setItem('ambitqa_eval_provider', activeProvider);
+    sessionStorage.setItem('ambitqa_eval_model', getCurrentModel());
+  } catch(e) {}
+  window.open('evaluator.html', '_blank');
+}
+
+function saveKey() {
+  const val = document.getElementById('apiKeyInput').value.trim();
+  if (!val) { alert('Please enter an API key.'); return; }
+  const provider = document.getElementById('modalProviderSelect')?.value || 'anthropic';
+  const model = document.getElementById('modalModelSelect')?.value || 'claude-sonnet-4-6';
+  if (provider === 'custom') {
+    const endpointVal = document.getElementById('modalCustomEndpointInput')?.value?.trim() || '';
+    if (!endpointVal) { alert('Please enter a Custom Endpoint URL.'); return; }
+    localStorage.setItem('ambitqa-custom-endpoint', endpointVal);
+    const navEndpoint = document.getElementById('customEndpointInput');
+    if (navEndpoint) navEndpoint.value = endpointVal;
+  }
+  apiKey = val;
+  activeProvider = provider;  // the confirmed key now backs this provider
+  // Sync provider/model from modal to nav
+  const navProvider = document.getElementById('providerSelect');
+  const navModel = document.getElementById('modelSelect');
+  if (navProvider) { navProvider.value = provider; }
+  if (navModel) { populateModelSelect('modelSelect', provider); navModel.value = model; }
+  localStorage.setItem('ambitqa-provider', provider);
+  localStorage.setItem('ambitqa-model', model);
+  previousApiKey = '';  // clear saved key — new key accepted
+  previousProvider = '';
+  document.getElementById('apiModal').style.display = 'none';
+  const cancelBtn = document.getElementById('modalCancelBtn');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  document.getElementById('userInput').focus();
+}
+document.getElementById('apiKeyInput').addEventListener('keydown', e => { if (e.key === 'Enter') saveKey(); });
+
+// Restore saved provider/model on load
+(function restoreProviderModel() {
+  const savedProvider = localStorage.getItem('ambitqa-provider') || 'anthropic';
+  const savedModel = localStorage.getItem('ambitqa-model') || 'claude-sonnet-4-6';
+  const savedEndpoint = localStorage.getItem('ambitqa-custom-endpoint') || '';
+  activeProvider = savedProvider;
+  const navProvider = document.getElementById('providerSelect');
+  const modalProvider = document.getElementById('modalProviderSelect');
+  if (navProvider) {
+    navProvider.value = savedProvider;
+    populateModelSelect('modelSelect', savedProvider);
+    const ms = document.getElementById('modelSelect');
+    if (ms) ms.value = savedModel;
+  }
+  if (modalProvider) {
+    modalProvider.value = savedProvider;
+    populateModelSelect('modalModelSelect', savedProvider);
+    const mms = document.getElementById('modalModelSelect');
+    if (mms) mms.value = savedModel;
+  }
+  // Restore custom endpoint into both the nav input and the modal input
+  const navEndpoint = document.getElementById('customEndpointInput');
+  if (navEndpoint) navEndpoint.value = savedEndpoint;
+  // Update label, placeholder, and console link to match saved provider
+  updateModalForProvider(savedProvider);
+  // Also sync nav provider change side effects (custom input visibility etc.)
+  if (savedProvider === 'custom') onProviderChange();
+})();
+
+// ─── RESIZABLE SIDEBARS ────────────────────────────────
+function makeResizable(handleId, sidebarId, side, storageKey) {
+  const handle = document.getElementById(handleId);
+  const sidebar = document.getElementById(sidebarId);
+  // Restore saved width
+  const saved = localStorage.getItem(storageKey);
+  if (saved) sidebar.style.width = saved + 'px';
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = sidebar.offsetWidth;
+    handle.classList.add('dragging');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    function onMove(ev) {
+      const delta = side === 'left' ? ev.clientX - startX : startX - ev.clientX;
+      const newWidth = Math.max(220, Math.min(450, startWidth + delta));
+      sidebar.style.width = newWidth + 'px';
+    }
+    function onUp() {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      handle.classList.remove('dragging');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      localStorage.setItem(storageKey, sidebar.offsetWidth);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  });
+}
+makeResizable('leftHandle', 'leftSidebar', 'left', 'ambitqa-left-width');
+makeResizable('rightHandle', 'rightSidebar', 'right', 'ambitqa-right-width');
+
+// ─── PANEL TOGGLES ─────────────────────────────────────
+function togglePanel(side) {
+  const sidebar = document.getElementById(side + 'Sidebar');
+  const handle = document.getElementById(side + 'Handle');
+  const toggle = document.getElementById(side + 'Toggle');
+  const willOpen = sidebar.classList.contains('collapsed');
+  sidebar.classList.toggle('collapsed');
+  handle.classList.toggle('collapsed');
+  toggle.classList.toggle('active', willOpen);
+  if (willOpen) {
+    // Reopened — reset to minimum width so user can expand from there
+    sidebar.style.width = '220px';
+  }
+  // Belt-and-suspenders: a sibling flipping to/from display:none doesn't
+  // always trigger ResizeObserver on the chat column as promptly as a
+  // direct size change does, so recompute explicitly too. requestAnimationFrame
+  // ensures the collapsed/expanded layout has actually settled first.
+  if (typeof repositionScrollBtns === 'function') {
+    requestAnimationFrame(() => {
+      repositionScrollBtns();
+      updateScrollBtnVisibility();
+    });
+  }
+}
+
+renderActions('general');
+</script>
+<!-- Scroll navigation buttons - fixed to viewport -->
+<button class="scroll-up-btn" id="scrollUpBtn" onclick="scrollToTop()" title="Scroll to top of chat">↑</button>
+<button class="scroll-down-btn" id="scrollDownBtn" onclick="scrollToBottom()" title="Scroll to latest message">↓</button>
+
+</body>
+</html>

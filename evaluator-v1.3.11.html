@@ -1,0 +1,1371 @@
+<!-- AmbitQA evaluator.html — v1.3.11 -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AmbitQA Evaluator</title>
+<style>
+  /* ── Design tokens — dark mode (default) ────────────────── */
+  :root {
+    --bg:        #0f1117;
+    --surface:   #181c27;
+    --surface2:  #1e2333;
+    --border:    #2a3050;
+    --border2:   #3a4468;
+    --text:      #e8eaf0;
+    --text2:     #a8aec4;
+    --text3:     #7b82a0;
+    --accent:    #6c63ff;
+    --accent2:   #8b83ff;
+    --pass:      #22c55e;
+    --warn:      #f59e0b;
+    --fail:      #ef4444;
+    --pass-bg:   rgba(34,197,94,.10);
+    --warn-bg:   rgba(245,158,11,.10);
+    --fail-bg:   rgba(239,68,68,.10);
+    --radius:    10px;
+    --radius-sm: 6px;
+  }
+
+  /* ── Light mode ───────────────────────────────────────────── */
+  [data-theme="light"] {
+    --bg:        #f4f5f7;
+    --surface:   #ffffff;
+    --surface2:  #f0f1f5;
+    --border:    #dde0ea;
+    --border2:   #c4c9d8;
+    --text:      #111827;
+    --text2:     #374151;
+    --text3:     #4b5563;
+    --accent:    #5b53f0;
+    --accent2:   #7c75f5;
+    --pass:      #16a34a;
+    --warn:      #d97706;
+    --fail:      #dc2626;
+    --pass-bg:   rgba(22,163,74,.08);
+    --warn-bg:   rgba(217,119,6,.08);
+    --fail-bg:   rgba(220,38,38,.08);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', system-ui, sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ──────────────────────────────────────────────── */
+  .app {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto 1fr;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  header {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 24px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .logo-icon {
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--accent), #a78bfa);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  .logo-text {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+  }
+
+  .logo-sub {
+    font-size: 11px;
+    color: var(--text3);
+    font-weight: 400;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+
+  .header-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .header-select {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 12px;
+    font-family: inherit;
+    padding: 6px 8px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.15s;
+  }
+  .header-select:focus { border-color: var(--accent); }
+  .header-select.custom-hidden { display: none; }
+
+  .api-key-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 6px 10px;
+  }
+
+  .api-key-wrap label {
+    font-size: 11px;
+    color: var(--text3);
+    white-space: nowrap;
+  }
+
+  .api-key-wrap input {
+    background: none;
+    border: none;
+    outline: none;
+    color: var(--text2);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    width: 200px;
+  }
+
+  /* ── Left pane: Input ────────────────────────────────────── */
+  .pane {
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .pane-left { border-right: 1px solid var(--border); }
+
+  .pane-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 16px;
+  }
+
+  .field-group { margin-bottom: 20px; }
+
+  .field-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text2);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  select, textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  select:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea {
+    resize: vertical;
+    min-height: 360px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.7;
+  }
+
+  .drag-zone {
+    border: 1.5px dashed var(--border2);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+    color: var(--text3);
+    font-size: 12px;
+    cursor: pointer;
+    margin-bottom: 16px;
+    transition: border-color 0.15s, background 0.15s;
+  }
+
+  .drag-zone:hover, .drag-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(108,99,255,.06);
+  }
+
+  .drag-zone .icon { font-size: 24px; margin-bottom: 6px; }
+
+  /* Red-flag chips */
+  .flag-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .flag {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: var(--fail-bg);
+    border: 1px solid rgba(239,68,68,.3);
+    color: var(--fail);
+    border-radius: 20px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  /* Evaluate button */
+  .btn-evaluate {
+    width: 100%;
+    padding: 13px;
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    letter-spacing: 0.2px;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+
+  .btn-evaluate:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); }
+  .btn-evaluate:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  /* ── Right pane: Results ─────────────────────────────────── */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text3);
+    text-align: center;
+    gap: 10px;
+  }
+
+  .empty-icon { font-size: 48px; opacity: 0.4; }
+
+  .loading-state {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    gap: 16px;
+    color: var(--text2);
+  }
+
+  .spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Verdict card */
+  .verdict-card {
+    border-radius: var(--radius);
+    padding: 20px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+
+  .verdict-card.PASS { background: var(--pass-bg); border: 1px solid rgba(34,197,94,.3); }
+  .verdict-card.WARN { background: var(--warn-bg); border: 1px solid rgba(245,158,11,.3); }
+  .verdict-card.FAIL { background: var(--fail-bg); border: 1px solid rgba(239,68,68,.3); }
+
+  .verdict-badge {
+    font-size: 28px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    min-width: 80px;
+    text-align: center;
+  }
+
+  .verdict-card.PASS .verdict-badge { color: var(--pass); }
+  .verdict-card.WARN .verdict-badge { color: var(--warn); }
+  .verdict-card.FAIL .verdict-badge { color: var(--fail); }
+
+  .verdict-score {
+    font-size: 42px;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .verdict-card.PASS .verdict-score { color: var(--pass); }
+  .verdict-card.WARN .verdict-score { color: var(--warn); }
+  .verdict-card.FAIL .verdict-score { color: var(--fail); }
+
+  .verdict-meta { flex: 1; }
+  .verdict-type { font-size: 12px; color: var(--text3); margin-bottom: 4px; }
+  .verdict-label { font-size: 16px; font-weight: 700; }
+
+  /* Dimension bars */
+  .section-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: var(--text3);
+    margin-bottom: 14px;
+  }
+
+  .dim-row {
+    display: grid;
+    grid-template-columns: 160px 1fr 38px;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .dim-name {
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text2);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bar-track {
+    height: 7px;
+    background: var(--surface2);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.6s cubic-bezier(.4,0,.2,1);
+  }
+
+  .bar-fill.high   { background: var(--pass); }
+  .bar-fill.medium { background: var(--warn); }
+  .bar-fill.low    { background: var(--fail); }
+
+  .dim-score {
+    font-size: 12px;
+    font-weight: 700;
+    text-align: right;
+  }
+
+  .dim-notes {
+    grid-column: 2 / -1;
+    font-size: 12px;
+    color: var(--text2);
+    margin-top: -8px;
+    margin-bottom: 6px;
+    padding-left: 0;
+    line-height: 1.6;
+  }
+
+  /* Issues list */
+  .issue-item {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--fail);
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
+  .issue-icon { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+
+  /* Improvement prompt box */
+  .improvement-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+    margin-top: 4px;
+  }
+
+  .improvement-text {
+    font-size: 12px;
+    color: var(--text2);
+    line-height: 1.7;
+    font-style: italic;
+    white-space: pre-wrap;
+  }
+
+  .copy-btn {
+    margin-top: 12px;
+    padding: 7px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    color: var(--text2);
+    font-size: 12px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent2); }
+
+  /* Sections */
+  .result-section { margin-bottom: 28px; }
+
+  /* Red flag banner in input */
+  .flag-banner {
+    background: var(--fail-bg);
+    border: 1px solid rgba(239,68,68,.25);
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    display: none;
+  }
+
+  .flag-banner-title {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--fail);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .app { grid-template-columns: 1fr; grid-template-rows: auto auto 1fr; }
+    .pane-left { border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+
+<div class="app">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🔬</div>
+      <div>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <div class="logo-text">AmbitQA Evaluator</div>
+          <span style="font-size:0.7rem;font-family:monospace;color:var(--text3);background:var(--surface2);border:1px solid var(--border);border-radius:999px;padding:2px 8px;font-weight:600;">v1.3.11</span>
+        </div>
+        <div class="logo-sub">AI Output Quality Scoring Engine</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <button id="themeToggle" onclick="toggleTheme()" title="Toggle light/dark mode" style="
+        background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+        width: 34px; height: 34px; cursor: pointer; font-size: 16px;
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text2); transition: background 0.15s;
+      ">☀️</button>
+      <select id="providerSelect" class="header-select" onchange="onProviderChange()" title="Select AI provider">
+        <option value="anthropic">Anthropic</option>
+        <option value="openai">OpenAI</option>
+        <option value="google">Google</option>
+        <option value="xai">xAI</option>
+        <option value="openrouter">OpenRouter</option>
+        <option value="custom">Custom</option>
+      </select>
+      <select id="modelSelect" class="header-select" title="Select model"></select>
+      <input type="text" id="customModelInput" class="header-select custom-hidden" placeholder="model-name..." title="Enter custom model name" style="width:120px;">
+      <input type="text" id="customEndpointInput" class="header-select custom-hidden" placeholder="https://your-endpoint/v1/chat/completions" title="Custom OpenAI-compatible endpoint URL" style="width:220px;">
+      <div class="api-key-wrap">
+        <label>API Key</label>
+        <input type="password" id="apiKey" placeholder="sk-ant-..." autocomplete="off">
+      </div>
+    </div>
+  </header>
+
+  <!-- LEFT: INPUT PANE -->
+  <div class="pane pane-left">
+    <div class="pane-title">Artifact Input</div>
+
+    <!-- Type selector -->
+    <div class="field-group">
+      <label class="field-label">Deliverable Type</label>
+      <select id="artifactType">
+        <option value="auto">Auto-detect</option>
+        <option value="test_plan">Test Plan</option>
+        <option value="risk_assessment">Risk Assessment / Risk Register</option>
+        <option value="test_cases">Test Cases</option>
+        <option value="bdd_gherkin">BDD / Gherkin Scenarios</option>
+        <option value="bug_report">Bug Report</option>
+        <option value="automation_code">Automation Code</option>
+        <option value="api_test_cases">API Test Cases</option>
+        <option value="security_test_cases">Security Test Cases</option>
+        <option value="performance_test_cases">Performance Test Plan / Script</option>
+        <option value="traceability_matrix">Requirements Traceability Matrix</option>
+        <option value="test_execution_report">Test Execution Report</option>
+        <option value="exit_criteria">Exit Criteria / DoD</option>
+        <option value="lessons_learned">Lessons Learned</option>
+      </select>
+    </div>
+
+    <!-- Drag zone -->
+    <div class="drag-zone" id="dragZone" style="cursor:pointer;" title="Click to browse, or drag a file here">
+      <div class="icon">📋</div>
+      <div>Drop a <strong>.txt</strong> or <strong>.md</strong> file here, click to browse, or paste below</div>
+    </div>
+    <input type="file" id="artifactFileInput" accept=".txt,.md,text/plain,text/markdown" style="display:none;">
+
+    <!-- Red-flag banner -->
+    <div class="flag-banner" id="flagBanner">
+      <div class="flag-banner-title">⚠️ Pre-scan flags detected</div>
+      <div class="flag-list" id="flagList"></div>
+    </div>
+
+    <!-- Artifact textarea -->
+    <div class="field-group">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <label class="field-label" style="margin-bottom:0;">QA Artifact Text</label>
+        <button onclick="clearArtifact()" title="Clear the artifact and start fresh" style="
+          background:none;border:none;color:var(--text3);font-size:11px;font-weight:600;
+          cursor:pointer;padding:2px 6px;display:flex;align-items:center;gap:4px;
+        ">✕ Clear</button>
+      </div>
+      <textarea id="artifactText" placeholder="Paste the QA artifact generated by AmbitQA here…"></textarea>
+    </div>
+
+    <button class="btn-evaluate" id="evaluateBtn" onclick="runEvaluation()">
+      Evaluate Artifact
+    </button>
+  </div>
+
+  <!-- RIGHT: RESULTS PANE -->
+  <div class="pane pane-right" id="resultsPane">
+
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">🎯</div>
+      <div style="font-size:15px;font-weight:600;color:var(--text2)">No evaluation yet</div>
+      <div style="font-size:12px;max-width:240px">Paste a QA artifact on the left and click Evaluate to score it against ISTQB/IEEE 829 rubrics.</div>
+    </div>
+
+    <div class="loading-state" id="loadingState">
+      <div class="spinner"></div>
+      <div style="font-size:13px">Evaluating artifact…</div>
+    </div>
+
+    <div id="resultsContent" style="display:none">
+      <!-- Results injected here -->
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ── Version ──────────────────────────────────────────────────────────────────
+const AMBIT_QA_VERSION = 'v1.3.11'; // bump this before each deploy
+
+// ── Rubrics (embedded) ─────────────────────────────────────────────────────
+const RUBRICS = {
+  test_plan: {
+    label: "Test Plan",
+    keywords: ["test plan","test strategy","testing scope","entry criteria","exit criteria","scope","test deliverables","risk"],
+    dimensions: {
+      completeness:      { weight: 0.25, description: "All IEEE 829 required sections present (Objectives, Scope, Out-of-Scope, Approach, Entry/Exit Criteria, Deliverables, Risks, Schedule, Resources)" },
+      specificity:       { weight: 0.20, description: "Scope, objectives, and criteria are concrete with named features, environments, and measurable thresholds" },
+      risk_coverage:     { weight: 0.20, description: "3+ risks each with likelihood rating, impact rating, and concrete mitigation strategy" },
+      executability:     { weight: 0.20, description: "Entry/exit criteria are binary pass/fail with no interpretation required" },
+      format_compliance: { weight: 0.15, description: "IEEE 829 structure with clear headers, version history, document ID, approval fields" }
+    }
+  },
+  test_cases: {
+    label: "Test Cases",
+    keywords: ["test case","test id","test step","expected result","precondition","tc-","priority","test type"],
+    dimensions: {
+      completeness:  { weight: 0.20, description: "Every case has: Test ID, Title, Preconditions, Steps, Expected Result, Priority, Test Type (positive/negative/edge)" },
+      specificity:   { weight: 0.25, description: "Steps name exact UI element, value, and action — not 'click the button' or 'fill in the form'" },
+      coverage:      { weight: 0.25, description: "Positive, negative, boundary, and error-handling cases all represented" },
+      executability: { weight: 0.20, description: "A new tester can execute with zero questions; no domain knowledge assumed" },
+      traceability:  { weight: 0.10, description: "Each case links to a requirement ID or acceptance criterion" }
+    }
+  },
+  bdd_gherkin: {
+    label: "BDD / Gherkin Scenarios",
+    keywords: ["feature:","scenario:","given","when","then","scenario outline","examples:","background:"],
+    dimensions: {
+      gherkin_syntax:    { weight: 0.25, description: "Valid Feature/Scenario/Given/When/Then/And structure with no double Given/When, missing Then, etc." },
+      declarative_style: { weight: 0.20, description: "Steps describe behavior, not UI actions ('the user is authenticated' not 'I click Login')" },
+      coverage:          { weight: 0.25, description: "Happy path + at least 2 alternate/error scenario flows" },
+      specificity:       { weight: 0.20, description: "Real or realistic data values in steps (emails, amounts, usernames) — not placeholders" },
+      format_compliance: { weight: 0.10, description: "Feature keyword, tags, Background where applicable, proper indentation" }
+    }
+  },
+  bug_report: {
+    label: "Bug Report",
+    keywords: ["bug","defect","issue","severity","priority","steps to reproduce","expected behavior","actual behavior","environment","repro"],
+    dimensions: {
+      completeness:       { weight: 0.25, description: "All 8 fields present: Title, Severity, Priority, Environment, Steps to Reproduce, Expected Result, Actual Result, Attachments note" },
+      reproducibility:    { weight: 0.30, description: "Numbered steps from precondition to exact trigger; zero assumptions required" },
+      expected_vs_actual: { weight: 0.25, description: "Expected and actual are specific, concrete, and directly contrast each other" },
+      severity_rationale: { weight: 0.10, description: "Severity and priority values are appropriate with 1-sentence justification each" },
+      format_compliance:  { weight: 0.10, description: "Jira-ready structure with all metadata; could be filed as-is" }
+    }
+  },
+  automation_code: {
+    label: "Automation Code",
+    keywords: ["playwright","selenium","cypress","cucumber","pytest","describe(","test(","it(","def test_","import","expect(","assert","page.","driver."],
+    dimensions: {
+      executability:       { weight: 0.30, description: "Runnable with standard install; no TODOs, FIXMEs, hardcoded waits, or placeholder selectors" },
+      selector_quality:    { weight: 0.25, description: "data-testid or role-based selectors; inferred selectors labeled as 'inferred — verify before running'" },
+      assertions:          { weight: 0.20, description: "Meaningful assertions on content, state, URL, or API response — not just visibility" },
+      framework_conventions: { weight: 0.15, description: "Page Object pattern, proper hooks (beforeEach/afterEach), no test interdependencies" },
+      honesty_labeling:    { weight: 0.10, description: "All inferred/guessed selectors explicitly labeled; assumptions surfaced as comments" }
+    }
+  },
+  traceability_matrix: {
+    label: "Requirements Traceability Matrix",
+    keywords: ["traceability","rtm","requirement","test case id","coverage","mapped","traced","req id"],
+    dimensions: {
+      completeness:    { weight: 0.30, description: "Every requirement row has ≥1 test case mapped" },
+      coverage_type:   { weight: 0.25, description: "Each requirement has minimum positive + negative test case" },
+      format_compliance: { weight: 0.25, description: "Standard table with: Req ID, Description, Test Case ID(s), Test Status, Priority" },
+      bidirectionality: { weight: 0.20, description: "Traceable both req→test and test→req; test IDs match actual case IDs" }
+    }
+  },
+  test_execution_report: {
+    label: "Test Execution Report",
+    keywords: ["execution report","test run","pass rate","failed tests","blocked","defects found","test cycle","total executed","pass count","fail count"],
+    dimensions: {
+      completeness:    { weight: 0.25, description: "All sections present: Executive Summary, Cycle Info, Pass/Fail Counts, Defects Found, Blocked Cases, Environment, Recommendation" },
+      metrics_accuracy: { weight: 0.30, description: "Pass+Fail+Blocked = Total; pass rate % is correct; defect count matches the defect list" },
+      recommendation:  { weight: 0.25, description: "Explicit Go/No-Go with reference to exit criteria and open defect risk" },
+      defect_detail:   { weight: 0.20, description: "Each defect listed with ID, title, severity, blocker status, and resolution" }
+    }
+  },
+  exit_criteria: {
+    label: "Exit Criteria / Definition of Done",
+    keywords: ["exit criteria","definition of done","release criteria","done when","acceptance criteria","quality gate","pass rate","defect threshold"],
+    dimensions: {
+      measurability: { weight: 0.40, description: "Every criterion is a specific metric with threshold (e.g. '≥95% test cases pass') — no 'all major bugs' or 'sufficient testing'" },
+      completeness:  { weight: 0.30, description: "Covers test execution, defect severity thresholds, code coverage, and performance criteria" },
+      traceability:  { weight: 0.30, description: "Each criterion traces to a test plan objective or specific requirement" }
+    }
+  },
+  lessons_learned: {
+    label: "Lessons Learned / Retrospective",
+    keywords: ["lessons learned","retrospective","what went well","what to improve","action items","root cause","process improvement"],
+    dimensions: {
+      balance:          { weight: 0.25, description: "Substantive content in both what-went-well and what-to-improve sections" },
+      specificity:      { weight: 0.30, description: "Lessons cite specific project incidents and root causes — not platitudes like 'communicate more'" },
+      action_items:     { weight: 0.30, description: "Each improvement has an assigned owner and target completion date" },
+      format_compliance: { weight: 0.15, description: "Project info header, structured sections, action item table" }
+    }
+  },
+  api_test_cases: {
+    label: "API Test Cases",
+    keywords: ["api","endpoint","rest","graphql","http","status code","response body","request","payload","postman","curl","jwt","oauth","bearer","content-type","authorization"],
+    dimensions: {
+      completeness:    { weight: 0.25, description: "Each test has: Endpoint, Method, Headers, Request Body, Expected Status Code, Expected Response Schema, Test Type (positive/negative/auth)" },
+      coverage:        { weight: 0.25, description: "Covers: success paths, error codes (400/401/403/404/500), auth failures, invalid payloads, boundary values, and edge cases" },
+      specificity:     { weight: 0.25, description: "Exact endpoints, sample payloads, expected JSON fields, and status codes — not 'verify the API works'" },
+      auth_coverage:   { weight: 0.15, description: "Authentication and authorization scenarios tested — missing/expired/invalid token cases included" },
+      executability:   { weight: 0.10, description: "Tests runnable in Postman or code with no missing information; base URL and auth setup documented" }
+    }
+  },
+  risk_assessment: {
+    label: "Risk Assessment / Risk Register",
+    keywords: ["risk assessment","risk register","risk id","risk category","risk level","likelihood","mitigation strategy","risk matrix","probability","contingency"],
+    dimensions: {
+      risk_coverage:      { weight: 0.30, description: "Risks span multiple realistic categories for the system type (auth/security, data integrity, performance, third-party/integration, business logic, compliance) — not narrowly clustered in one theme" },
+      rating_rigor:       { weight: 0.25, description: "Likelihood and Impact are each independently justified with a concrete reason, not just assigned H/M/L with no rationale; Risk Level is a defensible function of the two" },
+      mitigation_quality: { weight: 0.20, description: "Mitigation strategies are specific and actionable (named control, owner, or approach) — not generic filler like 'monitor closely' or 'test thoroughly'" },
+      completeness:       { weight: 0.15, description: "Every risk row has: Risk ID, Category, Description, Likelihood, Impact, Risk Level, Mitigation Strategy — no blank or placeholder fields" },
+      format_compliance:  { weight: 0.10, description: "IEEE 829 §9-aligned structure (Risks and Contingencies); consistent table format, document header/ID present" }
+    }
+  },
+  security_test_cases: {
+    label: "Security Test Cases",
+    keywords: ["owasp","xss","sql injection","csrf","idor","injection","authentication","session","vulnerability","security","penetration","attack","payload","malicious","unauthorized"],
+    dimensions: {
+      owasp_coverage:  { weight: 0.30, description: "Addresses relevant OWASP Top 10 categories for the application type (injection, broken auth, XSS, IDOR, misconfig, etc.)" },
+      attack_specificity: { weight: 0.25, description: "Actual attack vectors/payloads provided (e.g. XSS: &lt;script&gt;alert(1)&lt;/script&gt;, SQLi: ' OR 1=1--, Path traversal: ../../../etc/passwd) — not generic descriptions" },
+      completeness:    { weight: 0.20, description: "Each test has: Vulnerability type, Attack vector, Steps to reproduce, Expected behavior (blocked/sanitized), Severity rating" },
+      boundary_testing: { weight: 0.15, description: "Tests cover all input surfaces: forms, URL params, headers, cookies, API payloads, file uploads" },
+      remediation:     { weight: 0.10, description: "Each test includes expected secure behavior or links to remediation guidance" }
+    }
+  },
+  performance_test_cases: {
+    label: "Performance Test Plan / Script",
+    keywords: ["load test","stress test","spike test","soak test","performance","throughput","latency","response time","concurrent users","k6","jmeter","ramp up","ramp down","vus","think time","percentile","p95","p99","tps","rps"],
+    dimensions: {
+      scenario_coverage: { weight: 0.25, description: "Covers all required scenario types: load (normal), stress (beyond capacity), spike (sudden burst), soak (sustained duration)" },
+      thresholds:        { weight: 0.25, description: "Specific SLA thresholds defined: max response time (p95/p99), error rate %, min throughput (RPS/TPS)" },
+      script_quality:    { weight: 0.25, description: "Runnable script (k6/JMeter/etc.) with realistic think times, ramp-up/ramp-down, and parameterized data" },
+      completeness:      { weight: 0.15, description: "Test plan includes: target environment, test duration, virtual users, endpoints under test, monitoring approach" },
+      reporting:         { weight: 0.10, description: "Expected output metrics defined: latency percentiles, error rate, throughput graphs" }
+    }
+  }
+};
+
+// ── Red-flag patterns ──────────────────────────────────────────────────────
+const RED_FLAGS = [
+  { pattern: /\bclick the button\b/i,           issue: "Vague step — no selector or element label specified" },
+  { pattern: /\bfill in the form\b/i,           issue: "Vague step — no field names or values specified" },
+  { pattern: /\bnavigate to (?:the )?page\b/i,  issue: "Vague step — no URL or page name" },
+  { pattern: /\bverify it works\b/i,            issue: "Untestable assertion — no expected outcome" },
+  { pattern: /\bTODO\b/,                        issue: "Unresolved TODO placeholder in output" },
+  { pattern: /\bFIXME\b/,                       issue: "FIXME marker — output incomplete" },
+  { pattern: /YOUR_SELECTOR_HERE/i,             issue: "Placeholder selector — not a real locator" },
+  { pattern: /time\.sleep\(\d+\)/,              issue: "Hardcoded sleep — use explicit waits instead" },
+  { pattern: /waitForTimeout\(\d{4,}\)/,        issue: "Long hardcoded timeout — use auto-wait or locator-based wait" },
+  { pattern: /all major bugs/i,                 issue: "Unmeasurable exit criterion — specify severity thresholds" },
+  { pattern: /sufficient testing/i,             issue: "Vague exit criterion — specify coverage percentages" },
+  { pattern: /stakeholder satisfaction/i,       issue: "Subjective criterion — replace with measurable metric" },
+  { pattern: /(?:Given|When|Then)[^\n]*\n\s*(?:Given|When|Then)[^\n]*\n\s*(?:Given|When)/i, issue: "Possible duplicate Gherkin keyword sequence" },
+  { pattern: /communication is important/i,     issue: "Platitude in lessons learned — needs specific incident" },
+  { pattern: /test earlier next time/i,         issue: "Generic lesson — cite a specific event and root cause" },
+  // API testing red flags
+  { pattern: /verify the api works/i,           issue: "Vague API assertion — specify status code and response fields" },
+  { pattern: /check the response/i,             issue: "Vague assertion — specify exact field names and expected values" },
+  { pattern: /YOUR_API_KEY/i,                   issue: "Placeholder API key — replace with parameterized variable" },
+  { pattern: /http:\/\/localhost/i,             issue: "Hardcoded localhost URL — use environment variable" },
+  { pattern: /status.*200.*only/i,              issue: "Only testing 200 — add negative cases (400, 401, 403, 404, 500)" },
+  // Security testing red flags
+  { pattern: /test for xss/i,                  issue: "Vague XSS test — provide actual payload (e.g. &lt;script&gt;alert(1)&lt;/script&gt; or onerror=alert(1))" },
+  { pattern: /test for sql injection/i,         issue: "Vague SQL injection test — provide actual payload (e.g. ' OR 1=1--)" },
+  { pattern: /check for vulnerabilities/i,      issue: "Too generic — specify which OWASP Top 10 category and attack vector" },
+  { pattern: /run a security scan/i,            issue: "Vague — specify tool (Burp Suite, ZAP), scope, and what to look for" },
+  // Performance testing red flags
+  { pattern: /time\.sleep\(\d+\)/,             issue: "Hardcoded sleep — use think time or pacing functions" },
+  { pattern: /test with many users/i,           issue: "Vague load — specify exact virtual user count and ramp-up profile" },
+  { pattern: /performance should be good/i,     issue: "Unmeasurable threshold — specify p95/p99 response time and error rate %" },
+  { pattern: /no (?:p95|p99|percentile|sla|threshold)/i, issue: "Missing SLA thresholds — define max response time and error rate" },
+];
+
+// ── Type detection ─────────────────────────────────────────────────────────
+function detectType(text) {
+  const lower = text.toLowerCase();
+
+  // A document's title/first heading is a deliberate, explicit signal of
+  // what it is ("## HustlHub Website Test Plan") — far more reliable than
+  // counting incidental word reuse in body prose, where ordinary QA
+  // vocabulary (e.g. "severity", "environment", "priority") can appear
+  // several times in ANY document type regardless of what it actually is.
+  // Body-frequency counting alone can still let those generic words
+  // numerically outweigh an explicit title declaration; a heavy title
+  // bonus fixes that.
+  // Only treat this as a title signal when there's a genuine, deliberate
+  // heading — a guessed fallback (e.g. "first 150 characters") isn't a
+  // real title on a short document; it's just early body text, and can
+  // end up handing the bonus to several unrelated keywords at once
+  // instead of reflecting an actual authorial signal.
+  const firstHeadingMatch = text.match(/^#{1,3}\s+(.+)$/m);
+  const titleRegion = firstHeadingMatch ? firstHeadingMatch[1].toLowerCase() : null;
+
+  let best = null, bestScore = 0;
+  for (const [key, rubric] of Object.entries(RUBRICS)) {
+    // Count OCCURRENCES, not just presence. A boolean "does this keyword
+    // appear at all" check treats a document that says "test plan" five
+    // times the same as one that mentions "environment" once — which lets
+    // a single incidental match on a generic word from an unrelated
+    // rubric outweigh a distinctive phrase repeated throughout the actual
+    // document. Frequency weighting fixes that without needing per-rubric
+    // hand-tuning.
+    let score = 0;
+    for (const k of rubric.keywords) {
+      const escaped = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const matches = lower.match(new RegExp(escaped, 'g'));
+      score += matches ? matches.length : 0;
+      if (titleRegion && titleRegion.includes(k)) score += 10; // heavy title-match bonus, only for a real heading
+    }
+    if (score > bestScore) { bestScore = score; best = key; }
+  }
+  return best || 'test_cases';
+}
+
+// ── Red-flag scan ──────────────────────────────────────────────────────────
+function scanRedFlags(text) {
+  return RED_FLAGS.filter(f => f.pattern.test(text));
+}
+
+// ── Live red-flag scan on input ────────────────────────────────────────────
+document.getElementById('artifactText').addEventListener('input', function() {
+  const flags = scanRedFlags(this.value);
+  const banner = document.getElementById('flagBanner');
+  const list   = document.getElementById('flagList');
+  if (flags.length) {
+    banner.style.display = 'block';
+    list.innerHTML = flags.map(f => `<span class="flag">⚠ ${f.issue}</span>`).join('');
+  } else {
+    banner.style.display = 'none';
+    list.innerHTML = '';
+  }
+});
+
+// ── Drag & drop / click-to-browse ──────────────────────────────────────────
+const dz = document.getElementById('dragZone');
+const fileInput = document.getElementById('artifactFileInput');
+
+function loadArtifactFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('artifactText').value = ev.target.result;
+    document.getElementById('artifactText').dispatchEvent(new Event('input'));
+  };
+  reader.readAsText(file);
+}
+
+function clearArtifact() {
+  document.getElementById('artifactText').value = '';
+  document.getElementById('artifactText').dispatchEvent(new Event('input')); // resets red-flag banner
+  document.getElementById('artifactType').value = 'auto';
+  document.getElementById('artifactFileInput').value = ''; // allow re-picking the same file next time
+  // Reset the results pane back to its original empty state, in case a
+  // previous evaluation (or an in-progress one) is still showing.
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('loadingState').style.display = 'none';
+  document.getElementById('resultsContent').style.display = 'none';
+  document.getElementById('artifactText').focus();
+}
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  loadArtifactFile(e.dataTransfer.files[0]);
+});
+dz.addEventListener('click', () => fileInput.click());
+fileInput.addEventListener('change', () => {
+  loadArtifactFile(fileInput.files[0]);
+  fileInput.value = ''; // allow re-selecting the same file consecutively
+});
+
+// ── Build evaluator system prompt ─────────────────────────────────────────
+function buildSystemPrompt(rubric) {
+  const dims = Object.entries(rubric.dimensions).map(([k, v]) =>
+    `- ${k} (weight ${v.weight}): ${v.description}`).join('\n');
+
+  return `You are a senior QA evaluator trained in ISTQB Foundation Level and IEEE 829 standards. You evaluate QA artifacts with rigorous, consistent scoring.
+
+You will receive a QA artifact of type "${rubric.label}". Score each dimension from 0 to 10 using the descriptions below, then compute a weighted total (0-100).
+
+SCORING DIMENSIONS:
+${dims}
+
+VERDICT THRESHOLDS:
+- PASS: weighted_total >= 75
+- WARN: weighted_total 50-74
+- FAIL: weighted_total < 50
+
+RULES:
+1. Be strict. A score of 10 requires near-perfect execution. 7-8 is good. 5-6 is mediocre.
+2. If a required section or field is missing, cap that dimension at 4.
+3. Vague language ("click the button", "verify it works", "all major bugs") caps specificity/executability at 3.
+4. For automation_code: presence of TODO, FIXME, hardcoded waits, or unverified selectors not labeled as inferred caps executability at 5.
+5. Inferred selectors presented as confirmed in automation code caps honesty_labeling at 2.
+6. The improvement_prompt must be an EXACT prompt the user can paste back into AmbitQA to fix the top weaknesses. Be specific about which sections need work and what to add. Format it as an imperative instruction to the AI.
+
+Return ONLY a valid JSON object — no markdown fences, no preamble, no explanation. Exact shape required:
+
+{
+  "artifact_type": "string",
+  "scores": {
+    "<dimension_key>": {
+      "score": <0-10>,
+      "notes": "one concise sentence explaining the score"
+    }
+  },
+  "weighted_total": <0-100, 1 decimal>,
+  "verdict": "PASS" | "WARN" | "FAIL",
+  "top_issues": ["issue 1", "issue 2", "issue 3"],
+  "improvement_prompt": "The exact follow-up prompt to paste into AmbitQA to improve this artifact"
+}`;
+}
+
+// ── Main evaluation ────────────────────────────────────────────────────────
+// ── Provider/model selection (mirrors chatbot.html's mechanism) ───────────
+// NOTE: keep this list in sync with PROVIDER_MODELS in chatbot.html — model
+// IDs verified current as of July 2026; providers deprecate/rename these
+// every few months, so re-verify if you start seeing 404s.
+const PROVIDER_MODELS = {
+  anthropic: ['claude-sonnet-4-6','claude-opus-4-5','claude-haiku-4-5'],
+  openai: ['gpt-5.6-sol','gpt-5.6-terra','gpt-5.6-luna'],
+  google: ['gemini-2.5-pro','gemini-2.5-flash','gemini-3.5-flash'],
+  xai: ['grok-4.3','grok-4.1-fast'],
+  openrouter: ['openai/gpt-5.6-sol','anthropic/claude-sonnet-4-6','google/gemini-2.5-pro'],
+  custom: ['custom-model']
+};
+const PROVIDER_PLACEHOLDERS = {
+  anthropic: 'sk-ant-...',
+  openai: 'sk-...',
+  google: 'AIza...',
+  xai: 'xai-...',
+  openrouter: 'sk-or-...',
+  custom: 'Your API key...'
+};
+const PROVIDER_LABELS = {
+  anthropic: 'Anthropic',
+  openai: 'OpenAI',
+  google: 'Google',
+  xai: 'xAI',
+  openrouter: 'OpenRouter',
+  custom: 'Custom'
+};
+// Anthropic endpoint used directly; OpenAI-compatible providers share the
+// chat-completions format; Google and Custom are built dynamically at call
+// time (Google needs model+key in the URL; Custom's URL is user-supplied).
+const PROVIDER_ENDPOINTS = {
+  anthropic: 'https://api.anthropic.com/v1/messages',
+  openai: 'https://api.openai.com/v1/chat/completions',
+  xai: 'https://api.x.ai/v1/chat/completions',
+  openrouter: 'https://openrouter.ai/api/v1/chat/completions',
+};
+
+function populateModelSelect(provider) {
+  const sel = document.getElementById('modelSelect');
+  const models = PROVIDER_MODELS[provider] || [];
+  sel.innerHTML = models.map(m => `<option value="${m}">${m}</option>`).join('');
+}
+
+function getCurrentModel() {
+  const provider = document.getElementById('providerSelect').value;
+  if (provider === 'custom') {
+    return document.getElementById('customModelInput').value.trim() || 'custom-model';
+  }
+  return document.getElementById('modelSelect').value || PROVIDER_MODELS[provider]?.[0];
+}
+
+function getCustomEndpointUrl() {
+  return document.getElementById('customEndpointInput').value.trim()
+    || localStorage.getItem('ambitqa-custom-endpoint') // shared with chatbot.html (same origin)
+    || '';
+}
+
+// Each provider's key is remembered separately (they're different services,
+// a key for one is meaningless for another) — mirrors chatbot's per-provider
+// key model, but persisted here (unlike chatbot's session-only key), matching
+// the Evaluator's existing "remember my key" convenience for repeat use.
+function loadKeyForProvider(provider) {
+  const saved = localStorage.getItem(`ambitqa-evaluator-key-${provider}`) || '';
+  document.getElementById('apiKey').value = saved;
+  document.getElementById('apiKey').placeholder = PROVIDER_PLACEHOLDERS[provider] || 'API key...';
+}
+
+function onProviderChange() {
+  const provider = document.getElementById('providerSelect').value;
+  populateModelSelect(provider);
+  const customModelInput = document.getElementById('customModelInput');
+  const customEndpointInput = document.getElementById('customEndpointInput');
+  const modelSelect = document.getElementById('modelSelect');
+  if (provider === 'custom') {
+    customModelInput.classList.remove('custom-hidden');
+    customEndpointInput.classList.remove('custom-hidden');
+    customEndpointInput.value = localStorage.getItem('ambitqa-custom-endpoint') || '';
+    modelSelect.style.display = 'none';
+  } else {
+    customModelInput.classList.add('custom-hidden');
+    customEndpointInput.classList.add('custom-hidden');
+    modelSelect.style.display = '';
+  }
+  loadKeyForProvider(provider);
+  localStorage.setItem('ambitqa-evaluator-provider', provider);
+}
+
+// Single-shot multi-provider call for scoring. Simpler than chatbot.html's
+// callLLM: no conversation history, no multimodal — just one system-style
+// instruction set + one user turn (the artifact), expecting a single JSON
+// text response back.
+async function callEvaluatorLLM(provider, model, apiKey, systemPrompt, userContent) {
+  let raw;
+
+  if (provider === 'anthropic') {
+    const resp = await fetch(PROVIDER_ENDPOINTS.anthropic, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model, max_tokens: 2500, system: systemPrompt,
+        messages: [{ role: 'user', content: userContent }]
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    raw = data.content.map(b => b.text || '').join('');
+
+  } else if (provider === 'google') {
+    const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system_instruction: { parts: [{ text: systemPrompt }] },
+        contents: [{ role: 'user', parts: [{ text: userContent }] }],
+        generationConfig: { maxOutputTokens: 2500 }
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    raw = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+  } else {
+    // OpenAI-compatible: openai, xai, openrouter, custom
+    const endpoint = provider === 'custom' ? getCustomEndpointUrl() : PROVIDER_ENDPOINTS[provider];
+    if (!endpoint) throw new Error('No endpoint configured. Please enter a Custom Endpoint URL.');
+    const resp = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model, max_tokens: 2500,
+        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userContent }]
+      })
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    raw = data.choices?.[0]?.message?.content || '';
+  }
+
+  return raw;
+}
+
+// If the pasted content is a full HTML document (e.g. someone copied the
+// contents of an exported .html file rather than the plain markdown/text
+// response), extract just the visible text before doing anything else —
+// otherwise both auto-detect and the LLM evaluation itself have to wade
+// through a wall of CSS/markup that dwarfs the actual content signal.
+// Uses the browser's own HTML parser (via a detached element) rather
+// than a hand-rolled regex stripper, so it handles arbitrary HTML
+// correctly.
+function extractPlainTextIfHtml(input) {
+  const looksLikeHtml = /^\s*<!DOCTYPE html/i.test(input) || /<html[\s>]/i.test(input.slice(0, 500));
+  if (!looksLikeHtml) return input;
+  const tmp = document.createElement('div');
+  tmp.innerHTML = input;
+  tmp.querySelectorAll('script, style').forEach(el => el.remove());
+  return tmp.textContent.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+// Checks for AmbitQA's own embedded artifact-type metadata — a
+// deterministic signal from the chatbot itself (which quick action was
+// clicked to generate this), far more reliable than guessing from the
+// output text after the fact. Must run on the ORIGINAL text, before any
+// HTML-stripping (which would remove a <meta> tag along with everything
+// else) or keyword-based detectType().
+function detectEmbeddedType(rawText) {
+  // HTML export: <meta name="ambitqa-artifact-type" content="test_plan">
+  let m = rawText.match(/<meta\s+name=["']ambitqa-artifact-type["']\s+content=["']([a-z_]+)["']/i);
+  if (m) return m[1];
+  // MD export: <!-- ambitqa-artifact-type: test_plan -->
+  m = rawText.match(/<!--\s*ambitqa-artifact-type:\s*([a-z_]+)\s*-->/i);
+  if (m) return m[1];
+  // TXT export: Artifact-Type: test_plan (its own header line)
+  m = rawText.match(/^Artifact-Type:\s*([a-z_]+)\s*$/mi);
+  if (m) return m[1];
+  return null;
+}
+
+async function runEvaluation() {
+  // Strip non-ASCII characters that cause "non ISO-8859-1 code point" fetch header error
+  const apiKey = document.getElementById('apiKey').value
+    .trim()
+    .replace(/[^\x20-\x7E]/g, '');
+  const provider = document.getElementById('providerSelect').value;
+  const model = getCurrentModel();
+  let text = document.getElementById('artifactText').value.trim();
+  const typeEl = document.getElementById('artifactType');
+  let   type   = typeEl.value;
+
+  // Only check for embedded metadata if the user hasn't manually
+  // overridden the type themselves — an explicit manual selection
+  // should always win over any metadata found in the artifact.
+  if (type === 'auto') {
+    const embeddedType = detectEmbeddedType(text);
+    if (embeddedType && RUBRICS[embeddedType]) type = embeddedType;
+  }
+
+  const cleaned = extractPlainTextIfHtml(text);
+  if (cleaned !== text) {
+    // Update the visible textarea too, so what's shown matches what's
+    // actually being evaluated — otherwise the box would still display
+    // raw HTML/CSS while a different, cleaned version gets scored.
+    text = cleaned;
+    document.getElementById('artifactText').value = text;
+  }
+
+  if (!apiKey) { alert(`Please enter your ${PROVIDER_LABELS[provider] || provider} API key.`); return; }
+  if (!text)   { alert('Please paste a QA artifact to evaluate.'); return; }
+
+  if (type === 'auto') type = detectType(text); // only reached if no embedded metadata was found
+  const rubric = RUBRICS[type];
+
+  // UI: loading
+  document.getElementById('emptyState').style.display   = 'none';
+  document.getElementById('resultsContent').style.display = 'none';
+  document.getElementById('loadingState').style.display  = 'flex';
+  document.getElementById('evaluateBtn').disabled = true;
+
+  try {
+    const userContent = `ARTIFACT TYPE: ${rubric.label}\n\nARTIFACT:\n${text}`;
+    const raw = await callEvaluatorLLM(provider, model, apiKey, buildSystemPrompt(rubric), userContent);
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const result = JSON.parse(clean);
+
+    renderResults(result, rubric, type);
+
+  } catch (err) {
+    document.getElementById('loadingState').style.display = 'none';
+    document.getElementById('resultsContent').style.display = 'block';
+    // "Unterminated string" / "Unexpected end of JSON input" are the
+    // classic symptoms of a response getting cut off mid-JSON at the
+    // token limit, rather than a real parsing problem — give a more
+    // actionable message for that case specifically.
+    const looksTruncated = /unterminated string|unexpected end of json/i.test(err.message);
+    const message = looksTruncated
+      ? "The model's response was cut off before it finished (likely hit the output token limit). Try again — this is usually transient — or switch to a different model/provider if it keeps happening."
+      : err.message;
+    document.getElementById('resultsContent').innerHTML = `
+      <div style="padding:24px;color:var(--fail);background:var(--fail-bg);border-radius:var(--radius);border:1px solid rgba(239,68,68,.3)">
+        <strong>Evaluation failed</strong><br>
+        <span style="font-size:12px;color:var(--text2)">${message}</span>
+      </div>`;
+  } finally {
+    document.getElementById('evaluateBtn').disabled = false;
+    document.getElementById('loadingState').style.display = 'none';
+  }
+}
+
+// ── Render results ─────────────────────────────────────────────────────────
+function renderResults(result, rubric, type) {
+  const v = result.verdict;
+  const score = result.weighted_total;
+  const verdictEmoji = { PASS: '✅', WARN: '⚠️', FAIL: '❌' }[v];
+
+  // Build dimension rows
+  const dimRows = Object.entries(result.scores).map(([key, val]) => {
+    const w    = rubric.dimensions[key]?.weight || 0;
+    const pct  = (val.score / 10) * 100;
+    const cls  = val.score >= 7 ? 'high' : val.score >= 5 ? 'medium' : 'low';
+    const name = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const weightPct = Math.round(w * 100);
+    return `
+      <div class="dim-row">
+        <div class="dim-name" title="${rubric.dimensions[key]?.description || ''}">${name} <span style="color:var(--text3);font-size:10px">${weightPct}%</span></div>
+        <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+        <div class="dim-score" style="color:${cls==='high'?'var(--pass)':cls==='medium'?'var(--warn)':'var(--fail)'}">${val.score}/10</div>
+        <div></div>
+        <div class="dim-notes" style="grid-column:2/-1">${val.notes}</div>
+      </div>`;
+  }).join('');
+
+  // Issues
+  const issues = (result.top_issues || []).map(i => `
+    <div class="issue-item">
+      <span class="issue-icon">⚡</span>
+      <span>${i}</span>
+    </div>`).join('');
+
+  const html = `
+    <!-- Verdict card -->
+    <div class="result-section">
+      <div class="verdict-card ${v}">
+        <div class="verdict-badge">${v}</div>
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <div class="verdict-score">${score}</div>
+          <div style="font-size:10px;color:var(--text3)">/ 100</div>
+        </div>
+        <div class="verdict-meta">
+          <div class="verdict-type">${rubric.label}</div>
+          <div class="verdict-label">${verdictEmoji} ${v === 'PASS' ? 'Meets quality threshold' : v === 'WARN' ? 'Needs improvement before use' : 'Regenerate recommended'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:4px">Threshold: PASS ≥75 · WARN 50-74 · FAIL &lt;50</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dimension scores -->
+    <div class="result-section">
+      <div class="section-title">Dimension Breakdown</div>
+      ${dimRows}
+    </div>
+
+    <!-- Top issues -->
+    ${issues ? `
+    <div class="result-section">
+      <div class="section-title">Top Issues to Address</div>
+      ${issues}
+    </div>` : ''}
+
+    <!-- Improvement prompt -->
+    <div class="result-section">
+      <div class="section-title">Improvement Prompt — paste into AmbitQA</div>
+      <div class="improvement-box">
+        <div class="improvement-text" id="improvementText">${escHtml(result.improvement_prompt || 'No improvement needed.')}</div>
+        <button class="copy-btn" onclick="copyImprovement()">📋 Copy prompt</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('resultsContent').innerHTML = html;
+  document.getElementById('resultsContent').style.display = 'block';
+
+  // Animate bars
+  requestAnimationFrame(() => {
+    document.querySelectorAll('.bar-fill').forEach(el => {
+      const w = el.style.width;
+      el.style.width = '0';
+      requestAnimationFrame(() => { el.style.width = w; });
+    });
+  });
+}
+
+function copyImprovement() {
+  const txt = document.getElementById('improvementText')?.innerText || '';
+  navigator.clipboard.writeText(txt).then(() => {
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => btn.textContent = '📋 Copy prompt', 1800);
+  });
+}
+
+function escHtml(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Theme toggle ──────────────────────────────────────────────────────────
+function toggleTheme() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute('data-theme') !== 'light';
+  html.setAttribute('data-theme', isDark ? 'light' : 'dark');
+  document.getElementById('themeToggle').textContent = isDark ? '🌙' : '☀️';
+  localStorage.setItem('ambitqa-eval-theme', isDark ? 'light' : 'dark');
+}
+
+// Apply saved theme on load
+(function() {
+  const saved = localStorage.getItem('ambitqa-eval-theme') ||
+    (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  document.documentElement.setAttribute('data-theme', saved);
+  // Button text set after DOM ready
+  window.addEventListener('DOMContentLoaded', () => {
+    const btn = document.getElementById('themeToggle');
+    if (btn) btn.textContent = saved === 'light' ? '🌙' : '☀️';
+  });
+})();
+
+// ── Pre-fill from AmbitQA chatbot (via sessionStorage) ───────────────────
+window.addEventListener('load', () => {
+  // One-time migration: the old single ambitqa-evaluator-key becomes the
+  // anthropic-specific key (that was the only provider this ever supported),
+  // so nobody's already-saved key silently disappears.
+  const legacyKey = localStorage.getItem('ambitqa-evaluator-key');
+  if (legacyKey && !localStorage.getItem('ambitqa-evaluator-key-anthropic')) {
+    localStorage.setItem('ambitqa-evaluator-key-anthropic', legacyKey);
+  }
+
+  // Provider/model: prefer whatever chatbot.html had active when it launched
+  // this tab (passed via sessionStorage, which browsers carry over to a
+  // window.open'd same-origin tab); otherwise fall back to the Evaluator's
+  // own last-used provider/model; otherwise default to Anthropic.
+  const sessionProvider = sessionStorage.getItem('ambitqa_eval_provider');
+  const sessionModel = sessionStorage.getItem('ambitqa_eval_model');
+  const provider = sessionProvider || localStorage.getItem('ambitqa-evaluator-provider') || 'anthropic';
+
+  document.getElementById('providerSelect').value = provider;
+  populateModelSelect(provider);
+  if (provider === 'custom') {
+    document.getElementById('customModelInput').classList.remove('custom-hidden');
+    document.getElementById('customEndpointInput').classList.remove('custom-hidden');
+    document.getElementById('customEndpointInput').value = localStorage.getItem('ambitqa-custom-endpoint') || '';
+    document.getElementById('modelSelect').style.display = 'none';
+    if (sessionModel) document.getElementById('customModelInput').value = sessionModel;
+  } else if (sessionModel && PROVIDER_MODELS[provider]?.includes(sessionModel)) {
+    document.getElementById('modelSelect').value = sessionModel;
+  }
+  loadKeyForProvider(provider);
+  // Consume once — don't re-apply chatbot's provider/model on a manual refresh
+  // after the user may have deliberately switched providers in the Evaluator.
+  sessionStorage.removeItem('ambitqa_eval_provider');
+  sessionStorage.removeItem('ambitqa_eval_model');
+
+  const artifact = sessionStorage.getItem('ambitqa_eval_artifact');
+  const sessionType = sessionStorage.getItem('ambitqa_eval_type');
+  sessionStorage.removeItem('ambitqa_eval_type'); // consume once, same as provider/model above
+  if (artifact) {
+    sessionStorage.removeItem('ambitqa_eval_artifact'); // consume once; don't re-fill on refresh
+    const ta = document.getElementById('artifactText');
+    ta.value = artifact;
+    ta.dispatchEvent(new Event('input')); // trigger red-flag scan
+    // Prefer the type the chatbot already knows (which quick action was
+    // clicked — a deterministic fact) over guessing from the text via
+    // detectType(). Only guess when nothing was passed, e.g. this
+    // response came from a free-typed prompt with no known type.
+    const sel = document.getElementById('artifactType');
+    sel.value = (sessionType && RUBRICS[sessionType]) ? sessionType : detectType(artifact);
+  }
+});
+
+// Persist key to localStorage (per-provider) when user enters/changes it
+document.getElementById('apiKey').addEventListener('change', function() {
+  const clean = this.value.trim().replace(/[^\x20-\x7E]/g, '');
+  this.value = clean;
+  const provider = document.getElementById('providerSelect').value;
+  if (clean) localStorage.setItem(`ambitqa-evaluator-key-${provider}`, clean);
+});
+
+// ── Keyboard shortcut: Ctrl+Enter ─────────────────────────────────────────
+document.getElementById('artifactText').addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runEvaluation();
+});
+</script>
+</body>
+</html>
